@@ -1,0 +1,43 @@
+临时网络连接
+teamviewer
+ID:1405510382
+password:sri123456
+
+Anydesk
+ID:242456226
+password:sri123456
+
+IP地址分配：   
+              
+DB SERVER      			192.168.11.2
+MIS SERVER    			192.168.11.5
+ADM SERVER          		192.168.11.7
+COMM SERVER        		192.168.11.11
+IMAGE SERVER			192.168.11.20
+OCR(1-9)			192.168.11.30 - 192.168.11.38
+
+VCS client			192.168.11.40 
+Terminal(MES)			192.168.11.50 - 192.168.11.55
+MANAGER       			192.168.11.19
+SCADA1	 			192.168.11.16
+OBR1          			192.168.11.71(ICR890控制器)
+
+192.168.11.240-249 临时调试IP
+
+电控从192.168.11.100 - 192.168.11.199
+
+VPN                  		192.168.11.250 - 192.168.11.253
+
+用户名密码：
+
+DB SERVER      			root/123456
+MIS SERVER    			root/123456
+ADM SERVER          		administrator/SRI
+COMM SERVER        		administrator/SRI
+IMAGE SERVER			administrator/SRI 
+OCR(1-9)			post/SRI
+VCS client			post/123456 
+Terminal(MES)			post/123456
+MANAGER       			post/123456
+SCADA1	 			
+

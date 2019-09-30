@@ -1,0 +1,18 @@
+﻿// OCR_Hdr_COM.idl: OCR_Hdr_COM 的 IDL 源
+//
+
+// 此文件将由 MIDL 工具处理以
+// 生成类型库(OCRHdrCOM.tlb)和封送处理代码。
+
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+	uuid(8f3f8985-2af5-4d53-ae31-d77577d5c231),
+	version(1.0),
+]
+library OCRHdrCOMLib
+{
+	importlib("stdole2.tlb");
+};
+
