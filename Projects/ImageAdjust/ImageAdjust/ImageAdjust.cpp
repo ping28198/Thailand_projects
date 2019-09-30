@@ -185,7 +185,7 @@ int testSift()
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
 
 	//cv::Mat postcode_line_ref = imread("");
-	Mat postcode_line_ref = imread("E:/cpp_projects/Thailand_projects/资源文件/handwriterange3.jpg");
+	Mat postcode_line_ref = imread("E:/cpp_projects/Thailand_projects/_resource_file/handwriterange3.jpg");
 	tesseract::TessBaseAPI tess;
 	if (tess.Init("./tessdata", "eng"))
 	{
@@ -194,7 +194,7 @@ int testSift()
 	}
 	OcrAlgorithm_config ocrCfg;
 	HWDigitsRecog hwdr;
-	int res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v8_nm.pb");
+	int res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v8_dper.pb");
 	if (res ==0)
 	{
 		std::cout << "Handwrite Digits recognition initial fail" << std::endl;
@@ -202,7 +202,7 @@ int testSift()
 	}
 	ocrCfg.pHWDigitsRecog = &hwdr;
 	ocrCfg.pTess = &tess;
-	res = ocrCfg.match_data.getMatchDataFromImg_handwrite_addr("E:/cpp_projects/Thailand_projects/resource_file/handwriteRange.jpg");
+	res = ocrCfg.match_data.getMatchDataFromImg_handwrite_addr("E:/cpp_projects/Thailand_projects/_resource_file/handwriteRange.jpg");
 	if (res == 0)
 	{
 		std::cout << "load ref image fail" << std::endl;

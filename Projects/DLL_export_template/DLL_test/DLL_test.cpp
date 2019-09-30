@@ -40,8 +40,8 @@ int test_HDR_digits()
 	std::vector<std::string> imgfiles;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
 	HWDigitsRecog hwdr;
-	int res = hwdr.initial_avg("E:/python_projects/Digits_recog_cnn/HDRdigits_avg.pb");
-	res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v8_lw.pb");
+	//int res = hwdr.initial_avg("E:/python_projects/Digits_recog_cnn/HDRdigits_avg.pb");
+	int res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v8_dper_00961.pb");
 	if (res == 0)
 	{
 		std::cout << "initial error" << std::endl;
@@ -50,9 +50,20 @@ int test_HDR_digits()
 	std::cout << "图片数量：" << imgfiles.size() << endl;
 	
 	int low_confid_count = 0;
-
+	int diff_count = 0;
 	for (int i = 0; i < imgfiles.size(); i++)
 	{
+		char cc[2] = { 0 };
+		int a = -1;
+		size_t pos = imgfiles[i].rfind('_');
+		if (pos!= imgfiles[i].npos)
+		{
+			cc[0] = imgfiles[i][pos - 1];
+			a = atoi(cc);
+		}
+		
+
+
 		cv::Mat srcm = cv::imread(imgfiles[i]);
 		if (srcm.channels()==3)
 		{
@@ -64,44 +75,58 @@ int test_HDR_digits()
 		}
 		cv::threshold(srcm, srcm, 50, 0, CV_THRESH_TOZERO);
 
-		ImageProcessFunc::makeBoarderConstant(srcm, 0, 1);
+		//ImageProcessFunc::makeBoarderConstant(srcm, 0, 1);
 		Mat resized_mat;
 		resize(srcm(cv::Rect(1, 1, 26, 26)), resized_mat, Size(28, 28), cv::INTER_AREA);
 
+		Mat mm;
+		resized_mat.copyTo(mm);
 
 		std::vector<cv::Mat> imgs;
-		imgs.push_back(srcm);
+		imgs.push_back(mm);
 
-		//imshow("test_srcm", srcm);
+		//imshow("test_srcm", mm);
 
 		std::vector<int> class_; 
 		std::vector<float> confd_;
-		hwdr.detect_mat_avg(imgs, class_, confd_);
-		for (int j = 0; j < class_.size(); j++)
-		{
-			std::cout << "数字avg：" << class_[j] << "@" << confd_[j] << std::endl;
-			if (confd_[j]<0.9)
-			{
-				cout << "################" << endl;
-				
-			}
-		}
+		//hwdr.detect_mat_avg(imgs, class_, confd_);
+		int ind1 = 0;
+		int ind2 = 0;
+		//for (int j = 0; j < class_.size(); j++)
+		//{
+		//	std::cout << "数字avg：" << class_[j] << "@" << confd_[j] << std::endl;
+		//	if (confd_[j]<0.9)
+		//	{
+		//		cout << "################" << endl;
+		//		
+		//	}
+		//	ind1 = class_[j];
+
+		//}
 		hwdr.detect_mat(imgs, class_, confd_);
 		for (int j = 0; j < class_.size(); j++)
 		{
 			std::cout << "数字：" << class_[j] << "@" << confd_[j] << std::endl;
 			if (confd_[j] < 0.9)
 			{
-				cout << "################" << endl;
+				cout << "#####################" << endl;
 				low_confid_count++;
 			}
+			ind2 = class_[j];
 		}
 		//cout << srcm << endl ;
 		//waitKey(0);
+		if (ind2!=a)
+		{
+			cout << "$$$$$$$$$$$$$$$$$$$&&:"<< a << endl;
+			diff_count++;
+		}
+		//waitKey(0);
 	}
-
+	float diff_rate = diff_count / float(imgfiles.size());
 	float low_rate = low_confid_count / float(imgfiles.size());
 	cout << "低于阈值的比率：" << low_rate << endl;
+	cout << "差异率：" << diff_rate << endl;
 	//if (srcm.channels() == 3)
 	//{
 	//	cv::cvtColor(srcm, srcm, cv::COLOR_BGR2GRAY);
