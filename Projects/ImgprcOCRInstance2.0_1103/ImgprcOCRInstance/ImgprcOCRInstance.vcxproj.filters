@@ -146,9 +146,6 @@
     <None Include="system.ini" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\Libs\ImageFilter2008.lib" />
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="ReadMe.txt" />
   </ItemGroup>
 </Project>
