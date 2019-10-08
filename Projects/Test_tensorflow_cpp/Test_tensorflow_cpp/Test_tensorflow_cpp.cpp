@@ -37,12 +37,12 @@ int main() {
 	//char *pexeFullp = CT2A(exeFullPath);
 	//std::string imgNamestring = pexeFullp;
 
-	test_HDR_digits();
+	//test_HDR_digits();
 	//cutImageOnMouse();
 
 
 
-	//detectAllImages();
+	detectAllImages();
 
 }
 
@@ -245,19 +245,27 @@ int detectAllImages()
 
 
 	clock_t start_t, end_t;
+	double ave_timeconsume = 0;
 	for (int i=0;i<img_paths.size();i++)
 	{
-		start_t = clock();
+		
 		std::vector<cv::Rect> boxes;
 		std::vector<int> cs;
 		std::vector<float> ss;
 		std::cout << img_paths[i] << std::endl;
 		cv::Mat srcm = cv::imread(img_paths[i]);
+		start_t = clock();
 		yolo.detect_mat(srcm, boxes, cs, ss);
 		//yolo.detect_image(img_paths[i], boxes, cs, ss);
 		end_t = clock();
 		double timeconsume = (double)(end_t - start_t) / CLOCKS_PER_SEC;
-		printf("检测到box数量：%d,平均耗时:%fs \n",boxes.size(), timeconsume );
+		
+		printf("检测到box数量：%d,耗时:%fs ",boxes.size(), timeconsume, ave_timeconsume/(i+1));
+		if (i!=0)
+		{
+			ave_timeconsume += timeconsume;
+			printf("平均耗时:%fs\n",ave_timeconsume / i);
+		}
 
 		for (int j=0;j<boxes.size();j++)
 		{

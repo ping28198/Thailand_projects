@@ -37,8 +37,9 @@ int drawRotateRect(cv::Mat &srcmat, cv::RotatedRect RtRect);
 int getWaveletCoef_v2(cv::Mat srcMat, cv::Mat &dstMat, double threshold);
 int cvMat2Vector(cv::Mat srcMat, std::vector<std::vector<double>> &dstvector);
 void cvHaarWavelet(Mat &src, Mat &dst, int NIter=1);
-int testWavelet();
+int testCutParcelBox();
 int testSift();
+int testRotateTag();
 int Sift(string str2, cv::Mat &dstMat1, cv::Mat &dstMat2);
 int getParcelBox(cv::Mat srcmat, cv::Mat &dstmat, int isTopView);
 int query_match_count(std::vector<DMatch> &matches, DMatch & new_match); 
@@ -61,12 +62,13 @@ int main()
 
 
 	cout << CommonFunc::get_exe_dir()<<endl;
-	//testROI();
-
+	testROI();
+	//testAlignImages();
+	//testRotateTag();
 	//	
-
+	//testCutParcelBox();
 	//testWavelet();
-	testSift();
+	//testSift();
 	//	cv::Mat cof;
 	//	clock_t start_t = clock();
 
@@ -176,6 +178,55 @@ int testTimeConsume()
 
 	return 0;
 }
+int testRotateTag()
+{
+	//string dir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_cut_img/tag3_r\\*.jpg";
+	string dir = "F:\\detected_data\\tag_1\\*.jpg";
+	vector<string> imgfiles;
+	clock_t start_t, end_t;
+	double alltime = 0;
+	int ncount = 0;
+	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
+	//Mat referenceImg = imread("E:\\cpp_projects\\Thailand_projects\\_resource_file/sampleA3.jpg");
+	//Mat referenceImg2 = imread("E:\\cpp_projects\\Thailand_projects\\_resource_file/sampleA1.jpg");
+	OcrAlgorithm_config mconfig;
+	string refer1 = "E:\\cpp_projects\\Thailand_projects\\_resource_file/sampleA3.jpg";
+	string refer2 = "E:\\cpp_projects\\Thailand_projects\\_resource_file/sampleA1.jpg";
+	mconfig.match_data.getMatchDataFromImg_tagRotate_SURF(refer1, refer2);
+	OcrAlgorithm ocralg;
+	
+	
+	for (int i = 0; i < imgfiles.size(); i++)
+	{
+		
+		Mat src_img = imread(imgfiles[i]);
+		imshow("原图", src_img);
+		cout << imgfiles[i] << endl;
+		// Align images
+		Mat dstImg1, dstImg2;
+		start_t = clock();
+		ocralg.rotateImg_SURF(src_img, dstImg1, dstImg2, &mconfig);
+		end_t = clock();
+		double timeconsume = (double)(end_t - start_t) / CLOCKS_PER_SEC;
+		alltime += timeconsume;
+		ncount++;
+		printf("本次耗时:%fs 平均耗时%f\n", timeconsume, alltime / ncount);
+
+		imshow("dstimg1", dstImg1);
+		imshow("dstimg2", dstImg2);
+
+		waitKey(0);
+	}
+
+
+
+
+
+
+	return 1;
+}
+
+
 int testSift()
 {
 
@@ -630,10 +681,10 @@ int getWaveletCoef(cv::Mat srcMat, cv::Mat &dstMat,double threshold, int coef_di
 	return 1;
 }
 */
-int testWavelet()
+int testCutParcelBox()
 {
 	//CutMailBox cutMailBox;
-	string dir = "F:/shared_data_original/top/*.jpg";
+	string dir = "F:/shared_data_original/side/*.jpg";
 	//string dir = "F:/cpte_datasets/Tailand_tag_detection_datasets/Image[2019-8-2]/*.jpg";
 	vector<string> imgfiles;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
@@ -666,8 +717,8 @@ int testWavelet()
 		CutParcelBox cutbox;
 		//CutParcelBoxDll cutbox;
 		cv::Mat resizedMat;
-		int res = cutbox.getMailBox_Mat(srcmat, resizedMat,0);
-
+		//int res = cutbox.getMailBox_Mat(srcmat, resizedMat,0);
+		int res = cutbox.getMailBox_side(srcmat, resizedMat);
 		if (res!=0)
 		{
 			cv::resize(resizedMat, resizedMat, Size(), 0.2, 0.2);
@@ -1052,8 +1103,8 @@ void testAlignImages()
 	double alltime = 0;
 	int ncount = 0;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
-	Mat referenceImg = imread("E:/cpp_projects/code/Image Alignment Adnan/sampleA3.jpg");
-	Mat referenceImg2 = imread("E:/cpp_projects/code/Image Alignment Adnan/sampleA1.jpg");
+	Mat referenceImg = imread("E:\\cpp_projects\\Thailand_projects\\_resource_file/sampleA3.jpg");
+	Mat referenceImg2 = imread("E:\\cpp_projects\\Thailand_projects\\_resource_file/sampleA1.jpg");
 	for (int i = 0; i < imgfiles.size(); i++)
 	{
 		start_t = clock();
@@ -1091,13 +1142,13 @@ void alignImages(Mat &im1, Mat &im2, Mat &im1Reg, Mat &h)
 	Mat descriptors1, descriptors2;
 
 	// Detect ORB features and compute descriptors.
-	Ptr<Feature2D> orb = ORB::create(MAX_FEATURES);
+	Ptr<Feature2D> orb = SIFT::create(MAX_FEATURES);
 	orb->detectAndCompute(im1Gray, Mat(), keypoints1, descriptors1);
 	orb->detectAndCompute(im2Gray, Mat(), keypoints2, descriptors2);
 
 	// Match features.
 	std::vector<DMatch> matches;
-	Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
+	Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create(1);
 	matcher->match(descriptors1, descriptors2, matches, Mat());
 
 	// Sort matches by score
@@ -1111,7 +1162,8 @@ void alignImages(Mat &im1, Mat &im2, Mat &im1Reg, Mat &h)
 	// Draw top matches
 	Mat imMatches;
 	drawMatches(im1, keypoints1, im2, keypoints2, matches, imMatches);
-	imwrite("matches.jpg", imMatches);
+	imshow("immatches", imMatches);
+	//imwrite("matches.jpg", imMatches);
 
 
 	// Extract location of good matches

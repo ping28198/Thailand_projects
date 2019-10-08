@@ -195,7 +195,6 @@ int server()
 	MPFCommuication mRecOp;
 
 
-
 	SOCKADDR_IN clientAddr;
 	int len = sizeof(SOCKADDR);
 	while (1)
@@ -339,7 +338,7 @@ int server()
 
 			//printf("收到%d个字节\n", sig);
 			//printf("%s\n", recvBuf);
-			Sleep(1000);
+			Sleep(500);
 		}
 
 		//关闭连接

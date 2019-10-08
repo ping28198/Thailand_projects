@@ -50,11 +50,29 @@ int OcrAlgorithm::runOcr(Mat& RoiMat, char* pResults, size_t bufferlenth, tesser
 	int h = RoiMat.rows;
 	int sh = 30;
 	float scal_ = sh / float(h);
-	if (scal_ > 1.2)
+	cv::Mat resizedMat = RoiMat;
+	if (scal_ > 1.1)
 	{
-		cv::resize(RoiMat, RoiMat, cv::Size(), scal_, scal_,cv::INTER_AREA);
+		cv::resize(RoiMat, resizedMat, cv::Size(), scal_, scal_,cv::INTER_AREA);
 	}
 
+	cv::Rect mR;
+	mR.x = 0;
+	mR.y = 0;
+	mR.height = resizedMat.rows;
+	mR.width = resizedMat.cols / 4;
+
+#ifdef OCR_DEBUG
+	imshow("_runOcr调整亮度前", resizedMat);
+#endif // OCR_DEBUG
+	double vPix = getAveragePixelInRect(resizedMat, mR);
+	double anchor = 170;
+	double alpha = 3.0;
+	double beta = 200 - vPix;
+	adJustBrightness(resizedMat, alpha, beta, anchor);
+#ifdef OCR_DEBUG
+	imshow("_runOcr调整亮度后", resizedMat);
+#endif // OCR_DEBUG
 
 
 	int res = 0;
@@ -62,11 +80,11 @@ int OcrAlgorithm::runOcr(Mat& RoiMat, char* pResults, size_t bufferlenth, tesser
 	{
 		if (pTess==NULL) 
 		{
-			res = this->_runOcr(RoiMat, pResults, bufferlenth);
+			res = this->_runOcr(resizedMat, pResults, bufferlenth);
 		}
 		else
 		{
-			res = _runOcrPreload(RoiMat, pResults, bufferlenth, pTess);
+			res = _runOcrPreload(resizedMat, pResults, bufferlenth, pTess);
 		}
 		
 	}
@@ -122,7 +140,7 @@ int OcrAlgorithm::getOcrResultString(Mat src_img,tesseract::TessBaseAPI *pTess, 
 	//imshow("ORB rotatedimg1", rotatedImg1);
 	//imshow("ORB rotatedimg2", rotatedImg2);
 	//
-	rotateImg_SURF(src_img, rotatedImg1, rotatedImg2, pConfig);
+	rotateImg_SIFT(src_img, rotatedImg1, rotatedImg2, pConfig);
 
 
 	std::string roistring1, roistring2;
@@ -508,26 +526,7 @@ int OcrAlgorithm::_runOcr(Mat& RoiMat, char* pResults, size_t bufferlenth)
 int OcrAlgorithm::_runOcrPreload(Mat& RoiMat, char* pResults, size_t bufferlenth, tesseract::TessBaseAPI* pTess)
 {
 	if (RoiMat.empty()) return 0;
-	cv::Rect mR;
-	mR.x = 0;
-	mR.y = 0;
-	mR.height = RoiMat.rows;
-	mR.width = RoiMat.cols / 4;
 
-#ifdef OCR_DEBUG
-	imshow("_runOcr调整亮度前", RoiMat);
-#endif // OCR_DEBUG
-
-	
-
-	double vPix = getAveragePixelInRect(RoiMat, mR);
-	double anchor = 150;
-	double alpha = 2.0;
-	double beta = 200 - vPix;
-	adJustBrightness(RoiMat, alpha, beta, anchor);
-#ifdef OCR_DEBUG
-	imshow("_runOcr调整亮度后", RoiMat);
-#endif // OCR_DEBUG
 
 
 	int w = RoiMat.cols;
@@ -1115,8 +1114,13 @@ double OcrAlgorithm::rotateImg_ORB(Mat src_img, Mat referenceMat, Mat &dst_img)
 
 
 	// Draw top matches
-	//Mat imMatches;
-	//drawMatches(im1, keypoints1, im2, keypoints2, matches, imMatches);
+
+#ifdef ROTATE_IMG_DEBUG
+	Mat imMatches;
+	drawMatches(src_img, keypoints1, referenceMat, keypoints2, matches, imMatches);
+	imshow("imMatches", imMatches);
+#endif // ROTATE_IMG_DEBUG
+
 	//imwrite("matches.jpg", imMatches);
 
 	//计算距离
@@ -1151,7 +1155,7 @@ double OcrAlgorithm::rotateImg_ORB(Mat src_img, Mat referenceMat, Mat &dst_img)
 	return distance1;
 }
 
-int OcrAlgorithm::rotateImg_SURF(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &dst_img2,OcrAlgorithm_config *pConfig)
+int OcrAlgorithm::rotateImg_SIFT(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &dst_img2,OcrAlgorithm_config *pConfig)
 {
 	const int MAX_KEYPOINTS = 500;
 	using namespace cv;
@@ -1182,7 +1186,7 @@ int OcrAlgorithm::rotateImg_SURF(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &d
 
 	std::vector<DMatch> matches1;
 	std::vector<DMatch> matches2;
-	cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(6  );
+	cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(6);
 	matcher->match(pConfig->match_data.descriptors2, descriptors1, matches1, Mat());
 	matcher->match(pConfig->match_data.descriptors3, descriptors1, matches2, Mat());
 
@@ -1290,6 +1294,146 @@ int OcrAlgorithm::rotateImg_SURF(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &d
 	return 1;
 }
 
+
+int OcrAlgorithm::rotateImg_SURF(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &dst_img2, OcrAlgorithm_config *pConfig)
+{
+	const int MAX_KEYPOINTS = 500;
+	using namespace cv;
+	using namespace std;
+	using namespace cv::xfeatures2d;
+
+	const cv::Size refSize(504, 293); //参考的图像宽高。
+
+	cv::Mat im1Gray = src_img;
+
+	if (src_img.channels() == 3)
+	{
+		cv::cvtColor(src_img, im1Gray, CV_BGR2GRAY);
+	}
+
+	std::vector<KeyPoint> keypoints1;
+	cv::Mat descriptors1;
+	cv::Ptr<Feature2D> sift1 = cv::xfeatures2d::SURF::create(MAX_KEYPOINTS);
+	sift1->detectAndCompute(im1Gray, Mat(), keypoints1, descriptors1);
+
+
+	//waitKey(0);
+	// Match features.
+	//vector<vector<DMatch>> m_knnMatches;
+	//vector<DMatch>m_Matches;
+	//vector<DMatch>n_Matches;
+	//std::vector<DMatch> best_matches;
+
+	std::vector<DMatch> matches1;
+	std::vector<DMatch> matches2;
+	cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(6);
+	matcher->match(pConfig->match_data.descriptors2, descriptors1, matches1, Mat());
+	matcher->match(pConfig->match_data.descriptors3, descriptors1, matches2, Mat());
+
+	//matcher->knnMatch(descriptors2, descriptors1, m_knnMatches, 4);
+	//// Sort matches by score
+	//for (int i = 0; i < m_knnMatches.size(); i++)
+	//{
+	//	double dist_rate1 = m_knnMatches[i][0].distance / m_knnMatches[i][1].distance;
+	//	double dist_rate2 = m_knnMatches[i][1].distance / m_knnMatches[i][2].distance;
+	//	double dist_rate3 = m_knnMatches[i][2].distance / m_knnMatches[i][3].distance;
+	//	//if (dist_rate1< 0.5 && dist_rate2<0.5)
+	//	//{
+	//	//	continue;
+	//	//}
+	//	//if (dist_rate2 < 0.7)
+	//	//{
+	//	//	best_matches.push_back(m_knnMatches[i][0]);
+	//	//}
+	//	if (dist_rate1 < 0.4)
+	//	{
+	//		best_matches.push_back(m_knnMatches[i][0]);
+	//	}
+	//}
+	//排序
+
+	//std::sort(matches.begin(), matches.end());
+
+	std::sort(matches1.begin(), matches1.end());
+	std::sort(matches2.begin(), matches2.end());
+
+
+
+
+	std::vector<DMatch> best_matches_1;
+	std::vector<DMatch> best_matches_2;
+	std::vector<DMatch>::iterator it;
+	it = (matches1.size() < 50) ? matches1.end() : matches1.begin() + 50;
+	best_matches_1.insert(best_matches_1.end(), matches1.begin(), it);
+	it = (matches2.size() < 50) ? matches2.end() : matches2.begin() + 50;
+	best_matches_2.insert(best_matches_2.end(), matches2.begin(), it);
+
+	//将出现大于1个对应点的match 删除多余对应点
+	std::vector<DMatch> best_matches_1_;
+	std::vector<DMatch> best_matches_2_;
+	for (int i = 0; i < best_matches_1.size(); i++)
+	{
+		int res = query_match_count_(best_matches_1_, best_matches_1[i]);
+		if (res == 0)
+		{
+			best_matches_1_.push_back(best_matches_1[i]);
+		}
+	}
+	for (int i = 0; i < best_matches_2.size(); i++)
+	{
+		int res = query_match_count_(best_matches_2_, best_matches_2[i]);
+		if (res == 0)
+		{
+			best_matches_2_.push_back(best_matches_2[i]);
+		}
+	}
+
+
+
+
+	if (best_matches_1_.size() >= 4)
+	{
+		std::vector<Point2f> points_1, points_ref;
+		for (size_t i = 0; i < best_matches_1_.size(); i++)
+		{
+			points_1.push_back(keypoints1[best_matches_1_[i].trainIdx].pt);
+			points_ref.push_back(pConfig->match_data.keypoints2[best_matches_1_[i].queryIdx].pt);
+		}
+		Mat h1 = cv::findHomography(points_1, points_ref, cv::RANSAC);
+		//// Use homography to warp image
+		if (!h1.empty())
+		{
+			cv::warpPerspective(src_img, dst_img1, h1, refSize);
+#ifdef ROTATE_IMG_DEBUG
+			imshow("sift旋转1", dst_img1);
+#endif // DEBUG
+
+		}
+
+	}
+	if (best_matches_2_.size() >= 4)
+	{
+		std::vector<Point2f> points_1, points_ref;
+		for (size_t i = 0; i < best_matches_2_.size(); i++)
+		{
+			points_1.push_back(keypoints1[best_matches_2_[i].trainIdx].pt);
+			points_ref.push_back(pConfig->match_data.keypoints3[best_matches_2_[i].queryIdx].pt);
+		}
+		Mat h1 = cv::findHomography(points_1, points_ref, cv::RANSAC);
+		//// Use homography to warp image
+		if (!h1.empty())
+		{
+			cv::warpPerspective(src_img, dst_img2, h1, refSize);
+#ifdef ROTATE_IMG_DEBUG
+			imshow("sift旋转2", dst_img2);
+#endif // DEBU
+
+		}
+	}
+	//imshow("srd", src_img);
+	return 1;
+
+}
 
 int OcrAlgorithm::loadMatchData(const std::string &xmlfile, cv::Mat &descriptors2, cv::Mat &descriptors3, std::vector<cv::KeyPoint> &keypoints2, std::vector<cv::KeyPoint> &keypoints3)
 {
@@ -2774,7 +2918,7 @@ int MatchDataStruct::saveMatchData(const std::string &xmlfile)
 	return 1;
 }
 
-int MatchDataStruct::getMatchDataFromImg(const std::string &refImg1, const std::string &refImg2)
+int MatchDataStruct::getMatchDataFromImg_tagRotate_SIFT(const std::string &refImg1, const std::string &refImg2)
 {
 	const int MAX_KEYPOINTS = 500;
 	cv::Mat referenceMat1 = imread(refImg1);
@@ -2811,6 +2955,42 @@ int MatchDataStruct::getMatchDataFromImg(const std::string &refImg1, const std::
 }
 
 
+int MatchDataStruct::getMatchDataFromImg_tagRotate_SURF(const std::string &refImg1, const std::string &refImg2)
+{
+	const int MAX_KEYPOINTS = 500;
+	cv::Mat referenceMat1 = imread(refImg1);
+	cv::Mat referenceMat2 = imread(refImg2);
+	if (referenceMat1.empty() || referenceMat2.empty())
+	{
+		return 0;
+	}
+
+	const cv::Size refSize(504, 293); //设置的图像宽高。
+
+	cv::resize(referenceMat1, referenceMat1, refSize);
+	cv::resize(referenceMat2, referenceMat2, refSize);
+
+	cv::Mat im2Gray = referenceMat1;
+	cv::Mat im3Gray = referenceMat2;
+
+	if (referenceMat1.channels() == 3)
+	{
+		cv::cvtColor(referenceMat1, im2Gray, CV_BGR2GRAY);
+	}
+	if (referenceMat2.channels() == 3)
+	{
+		cv::cvtColor(referenceMat2, im3Gray, CV_BGR2GRAY);
+	}
+
+	// Detect ORB features and compute descriptors.
+	cv::Ptr<Feature2D> sift1 = cv::xfeatures2d::SURF::create(MAX_KEYPOINTS);
+
+	sift1->detectAndCompute(im2Gray, Mat(), keypoints2, descriptors2);
+	sift1->detectAndCompute(im3Gray, Mat(), keypoints3, descriptors3);
+
+	return 1;
+}
+
 int MatchDataStruct::getMatchDataFromImg_handwrite_addr(const std::string &refImg)
 {
 	const int MAX_KEYPOINTS = 512;
@@ -2821,13 +3001,11 @@ int MatchDataStruct::getMatchDataFromImg_handwrite_addr(const std::string &refIm
 		return 0;
 	}
 
-	float scal = 300.0 / max(referenceMat1.cols, referenceMat1.rows);
+	//float scal = 300.0 / max(referenceMat1.cols, referenceMat1.rows);
 
-	cv::resize(referenceMat1, referenceMat1, cv::Size(), scal, scal,INTER_AREA);
+	cv::resize(referenceMat1, referenceMat1, cv::Size(300,188), 0, 0,INTER_AREA);
 	
-
 	cv::Mat im2Gray = referenceMat1;
-
 
 	if (referenceMat1.channels() == 3)
 	{
@@ -3566,47 +3744,7 @@ int HWDigitsOCR::rotateImage(const cv::Mat &srcMat, cv::Mat &dstMat)
 	cv::Mat src_m = srcMat;
 	ImageProcessFunc::rotate_arbitrarily_angle(src_m, dstMat, best_angle);
 
-
-	////聚类线段方向
-	//cv::Mat pt_kmeans(lines_angle.size(), 1, CV_32FC1);
-	//for (int i = 0; i < lines_angle.size(); i++)
-	//{
-	//	pt_kmeans.at<Vec2f>(i, 0)[0] = lines_angle[i];
-	//}
-	//std::vector<int> labels;
-	//std::vector<float> centers;
-	//int clusters_num = 2;
-	//cv::kmeans(pt_kmeans, clusters_num, labels, TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 10, 1.0), 3, KMEANS_PP_CENTERS, centers);
-
-	////旋转数量最多的一类
-	//int class_0_num=0, class_1_num=0;
-	//for (int i=0;i<labels.size();i++)//取最多的一类
-	//{
-	//	if (labels[i] == 0) class_0_num++;
-	//	if (labels[i] == 1) class_1_num++;
-	//}
-	//int class_index = (class_0_num < class_1_num) ? 1 : 0;
-
-	////计算平均角度
-	//float rotate_angle = 0;
-	//int _count = 0;
-	//for (int i = 0; i < labels.size(); i++)
-	//{
-	//	if (labels[i] == class_index)
-	//	{
-	//		rotate_angle += lines_angle[i];
-	//		_count++;
-	//	}
-	//}
-	//rotate_angle /= float(_count);
-
-	//旋转
-
-//#ifdef POSTCODE_BOX_DEBUG
-//	imshow("rotate_POSTCODE_BOX", dstMat);
-//#endif
 	
-
 	return 1;
 }
 

@@ -5,7 +5,7 @@
 
 
 #define default_pixel_threshold 40
-
+//#define CUT_PARCEL_BOX_DEBUG
 
 class CutParcelBox
 {

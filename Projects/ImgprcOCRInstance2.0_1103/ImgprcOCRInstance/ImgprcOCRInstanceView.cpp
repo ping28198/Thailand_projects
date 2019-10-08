@@ -28,7 +28,7 @@ void CALLBACK TimeFunctionImg(PVOID lpParam, BOOLEAN TimerOrWaitFired);
 #define IADM_TIMER_RESOLUTION 5  // 多媒体时钟精度（单位：毫秒）
 
 
-#define OCR_VIEW_DEBUG
+//#define OCR_VIEW_DEBUG
 
 #ifndef OCR_VIEW_DEBUG
 Logger logger("./log", LogLevelMid);
@@ -93,7 +93,7 @@ extern UINT ImageProcessThread(LPVOID pParam)
 
 
 	//加载匹配数据
-	res = mconfig.match_data.getMatchDataFromImg(mconfig.ORB_template_img1_path, mconfig.ORB_template_img2_path);
+	res = mconfig.match_data.getMatchDataFromImg_tagRotate_SIFT(mconfig.ORB_template_img1_path, mconfig.ORB_template_img2_path);
 	if (res == 0)
 	{
 		logger.TraceError("加载匹配数据失败");
@@ -249,8 +249,8 @@ void CImgprcOCRInstanceView::OnInitialUpdate()
 	m_MachineComm.m_chsDstPort = m_cstrSeverPort;
 
 //	strcpy_s(m_MachineComm.m_chsIPAddress,m_cstrIADMIP.GetBuffer(0)); //tX
-	strcpy_s(m_MachineComm.m_chsPCName,"IADM");
-	strcpy_s(m_MachineComm.m_chsShortName,"IADM");
+	strcpy_s(m_MachineComm.m_chsPCName,"ImageServer");
+	strcpy_s(m_MachineComm.m_chsShortName,"ImageServer");
 	m_MachineComm.ClearMachineBuf();
 
 
@@ -480,11 +480,11 @@ void CImgprcOCRInstanceView::OnTimer(UINT_PTR nIDEvent)
 	m_crlSocket.GetWindowTextW(cstrLine);
 	if(m_bClientSockState)
 	{
-		cstrNewLine.Format(_T("OCR:%d connected with IADM %s"),m_iLocPort,m_cstrSeverIP);
+		cstrNewLine.Format(_T("OCR:%d connected with ImageServer %s"),m_iLocPort,m_cstrSeverIP);
 	}
 	else
 	{
-		cstrNewLine.Format(_T("OCR:%d disconnect with IADM %s"),m_iLocPort,m_cstrSeverIP);
+		cstrNewLine.Format(_T("OCR:%d disconnect with ImageServer %s"),m_iLocPort,m_cstrSeverIP);
 	}
 	if(cstrNewLine!=cstrLine)
 	{
@@ -757,7 +757,7 @@ void  CImgprcOCRInstanceView::ProcessOneRMes(BYTE* mbMesPos)
 	}
 	catch(...)
 	{
-		sTemp.Format(_T("ProcessOneRMes():Error IADM RevMesPos"), mbMesPos);
+		sTemp.Format(_T("ProcessOneRMes():Error ImageServer RevMesPos"), mbMesPos);
 		ToDisplay(0, sTemp);
 	}
 }
@@ -840,11 +840,11 @@ int CImgprcOCRInstanceView::ReadINI(void)
 	GetPrivateProfileStringW(app,key,LPCWSTR(_T("log\\")),wchsTemp,IS_MES_MAX_LEN,cstrIniPath);
 	m_cstrLogDir = wchsTemp;
 
-	key =CString(_T("IADMIP"));
+	key =CString(_T("ImageServerIP"));
 	GetPrivateProfileStringW(app,key,LPCWSTR("192.168.1.30"),wchsTemp,IS_MES_MAX_LEN,cstrIniPath); 
 	m_cstrSeverIP= wchsTemp;
 
-	key = CString(_T("IADMPORT"));
+	key = CString(_T("ImageServerPort"));
 	m_cstrSeverPort = GetPrivateProfileIntW(app, key, 9999, cstrIniPath);
 
 	key = CString(_T("TagDetectConfidence"));
@@ -976,7 +976,7 @@ void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 	{
 		MergeHomoTasks(waitPackageTasks, mtask);
 		BYTE next_type = mtask.GetNextProcessType(pConfig);
-		if (next_type!=ST_TASK_PROC_OVER)// && mtask.m_postcodeNum == 0)
+		if (next_type!=ST_TASK_PROC_OVER && mtask.m_postcodeNum == 0)
 		{
 			ChangeTasksProcessType(mtask, mtask.m_processType, next_type);
 		}

@@ -52,6 +52,12 @@ int CutParcelBox::getMailBox_RtRect(cv::Mat &srcMat, cv::RotatedRect &dstRtRect,
 	////medianBlur(src_gray, src_gray, 3);
 	cv::threshold(rsd_img, rsd_img, binaryThreshold, 255, CV_THRESH_BINARY);
 
+#ifdef CUT_PARCEL_BOX_DEBUG
+	imshow("cut_parcel_threshold", rsd_img);
+#endif // CUT_PARCEL_BOX_DEBUG
+
+
+
 	cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(8, 8));
 	cv::morphologyEx(rsd_img, rsd_img, cv::MORPH_CLOSE, element);
 
@@ -61,6 +67,9 @@ int CutParcelBox::getMailBox_RtRect(cv::Mat &srcMat, cv::RotatedRect &dstRtRect,
 	element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(4, 4));
 	morphologyEx(rsd_img, rsd_img, cv::MORPH_DILATE, element);
 
+#ifdef CUT_PARCEL_BOX_DEBUG
+	imshow("cut_parcel_morphology", rsd_img);
+#endif // CUT_PARCEL_BOX_DEBUG
 	//imshow("二值化", rsd_img);
 	//waitKey(0);
 
@@ -169,8 +178,15 @@ int CutParcelBox::getMailBox_side(cv::Mat &srcmat, cv::Rect &dstRect, double box
 	//imshow("resized", resizedMat);
 	cv::Mat sobelmat;
 	cv::Sobel(resizedMat, sobelmat, CV_8U, 1, 1);
+#ifdef CUT_PARCEL_BOX_DEBUG
+	imshow("cut_parcel_side_sobel", sobelmat);
+#endif // CUT_PARCEL_BOX_DEBUG
 
 	cv::threshold(sobelmat, sobelmat, 5, 255, cv::THRESH_BINARY);
+
+#ifdef CUT_PARCEL_BOX_DEBUG
+	imshow("cut_parcel_side_threshold", sobelmat);
+#endif // CUT_PARCEL_BOX_DEBUG
 
 	cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(8, 8));
 	cv::morphologyEx(sobelmat, sobelmat, cv::MORPH_CLOSE, element);
@@ -179,6 +195,11 @@ int CutParcelBox::getMailBox_side(cv::Mat &srcmat, cv::Rect &dstRect, double box
 	element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
 	cv::morphologyEx(sobelmat, sobelmat, cv::MORPH_ERODE, element);
 	//imshow("sobel", sobelmat);
+
+#ifdef CUT_PARCEL_BOX_DEBUG
+	imshow("cut_parcel_side_morphology", sobelmat);
+#endif // CUT_PARCEL_BOX_DEBUG
+
 
 	std::vector<std::vector<cv::Point>>contours;
 	std::vector<cv::Vec4i> hierarchy;

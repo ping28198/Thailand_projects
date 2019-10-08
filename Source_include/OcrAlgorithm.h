@@ -21,7 +21,8 @@ public:
 	std::vector<cv::KeyPoint> keypoints_handwrite_addr;
 	int loadMatchData(const std::string &xmlfile);
 	int saveMatchData(const std::string &xmlfile);
-	int getMatchDataFromImg(const std::string &refImg1, const std::string &refImg2);
+	int getMatchDataFromImg_tagRotate_SIFT(const std::string &refImg1, const std::string &refImg2);
+	int getMatchDataFromImg_tagRotate_SURF(const std::string &refImg1, const std::string &refImg2);
 	int getMatchDataFromImg_handwrite_addr(const std::string &refImg);
 };
 
@@ -70,8 +71,8 @@ public:
 	int getOcrRoi(cv::Mat& src_img, std::vector<cv::Mat> &roi_imgs);
 	int runOcr(cv::Mat& RoiMat, char* pResults, size_t bufferlenth, tesseract::TessBaseAPI* pTess=NULL);
 	int getOcrResultString(cv::Mat src_img, tesseract::TessBaseAPI *psTess, std::string &resultstring, OcrAlgorithm_config *pConfig);
-	int rotateImg_SURF(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &dst_img2, OcrAlgorithm_config *pConfig);//返回平均距离
-	
+	int rotateImg_SIFT(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &dst_img2, OcrAlgorithm_config *pConfig);
+	int rotateImg_SURF(cv::Mat &src_img, cv::Mat &dst_img1, cv::Mat &dst_img2, OcrAlgorithm_config *pConfig);
 	//从本地加载存储的特征点数据
 	int loadMatchData(const std::string &xmlfile,cv::Mat &descriptors2, cv::Mat &descriptors3, 
 		std::vector<cv::KeyPoint> &keypoints2, std::vector<cv::KeyPoint> &keypoints3);
@@ -152,6 +153,7 @@ public:
 
 };
 
+//识别泰国手写数字类，包括定位和ocr
 class HWDigitsOCR
 {
 public:
