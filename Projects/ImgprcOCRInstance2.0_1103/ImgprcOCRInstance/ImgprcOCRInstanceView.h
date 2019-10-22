@@ -114,6 +114,8 @@ public:
 	//日志
 	FILE * m_pFileLog;
 	FILE * m_pFileSta;
+	int m_LogLevel = 0;
+
 
 	//程序开始运行时间
 	CTime m_ctime ;					//开机时间
@@ -179,7 +181,7 @@ public:
 	//根据当前任务，获取其等待打包的兄弟任务,同一任务类型
 	int GetWaitPackageTasks(ImgprcTask &mTask,std::vector<ImgprcTask> &wTasks);
 
-	//改变任务的 任务类型, 同时复位处理状态为未处理
+	//改变任务的 任务类型，包括子任务, 同时复位处理状态为未处理
 	int ChangeTasksProcessType(ImgprcTask &mTask, BYTE old_type, BYTE new_type);
 
 

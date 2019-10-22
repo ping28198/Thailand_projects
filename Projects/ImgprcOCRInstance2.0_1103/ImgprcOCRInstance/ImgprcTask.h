@@ -107,6 +107,7 @@ public:
 		OcrAlgorithm_config *pOcrConifg, Logger *pLogger,std::vector<std::string>&detected_postcodes);
 	int PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger);
 	int CopyImageFilesFromServer(const std::string &serverIP, const CString &localImgDir, Logger *pLogger, void* pRand, bool appliedCopy=true);
+	int DeleteLocalCacheFile(Logger *pLogger);
 	int GetPostcodeFromHandwrite(const std::string &localimgpath, bool isTopView,
 		OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes);
 	BYTE GetNextProcessType(OcrAlgorithm_config *pOcrConifg);

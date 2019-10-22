@@ -15,6 +15,7 @@
 #include "wavelet2dcpp.h"
 #include "CutParcelBox.h"
 #include <random>
+
 //#include "CutParcelBoxDll.h"
 #include "time.h"
 #include "math.h"
@@ -43,6 +44,7 @@ int testRotateTag();
 int Sift(string str2, cv::Mat &dstMat1, cv::Mat &dstMat2);
 int getParcelBox(cv::Mat srcmat, cv::Mat &dstmat, int isTopView);
 int query_match_count(std::vector<DMatch> &matches, DMatch & new_match); 
+int HWdigitsOCR_for_test();
 
 default_random_engine e;
 
@@ -53,16 +55,32 @@ int main()
 
 
 
+
+	//cout << a << endl;
+	//QueryPerformanceCounter(&tima);
+	//long long t1 = tima.QuadPart;
+	//string a1 = to_string(t1);
+	//cout << a1 << endl;
+	//CString s;
 	
 
+	HWdigitsOCR_for_test();
 
 
+	//cout << CommonFunc::get_exe_dir()<<endl;
 
+	//for (int i=0;i<10;i++)
+	//{
+	//	cout << i << " ";
+	//}
+	//cout << endl;
+	//for (int i = 0; i < 10; ++i)
+	//{
+	//	cout << i << " ";
+	//}
+	//cout << endl;
 
-
-
-	cout << CommonFunc::get_exe_dir()<<endl;
-	testROI();
+	//testROI();
 	//testAlignImages();
 	//testRotateTag();
 	//	
@@ -264,6 +282,8 @@ int testSift()
 	vector<Mat> box_imgs;
 	for (int i = 0; i < imgfiles.size(); i++)
 	{
+		//Mat m1, m2;
+		//Sift(imgfiles[i], m1, m2);
 		//if (i < 6) continue;
 		cout << "图片：" << i << endl;
 		string post_str;
@@ -307,7 +327,7 @@ int Sift(string str2,cv::Mat &dstMat1, cv::Mat &dstMat2)
 {
 	const int MAX_FEATURES = 512;
 	const float GOOD_MATCH_PERCENT = 0.15f;
-	Mat src_im1 = imread("E:/cpp_projects/Thailand_projects/资源文件/handwriterange.jpg");
+	Mat src_im1 = imread("E:/cpp_projects/Thailand_projects/_resource_file/handwriteRange.jpg");
 	Mat src_im2 = imread(str2);
 
 	float scal_max1 = 300.0 / max(src_im1.cols, src_im1.rows);
@@ -476,7 +496,7 @@ int Sift(string str2,cv::Mat &dstMat1, cv::Mat &dstMat2)
 
 
 
-
+	/*
 	FindHomography_2d findhg;
 	Mat ms1, ms2;
 	cv::RNG rng;
@@ -543,11 +563,11 @@ int Sift(string str2,cv::Mat &dstMat1, cv::Mat &dstMat2)
 	result1_size.height *= (scal_xy_1.y*zoom_s);
 	result2_size.width *= (scal_xy_2.x*zoom_s);
 	result2_size.height *= (scal_xy_2.y*zoom_s);
+	*/
 
-
-	//cv::Mat maskm;
-	//Mat h1 = findHomography(points_class1, points_ref1, maskm, RANSAC);
-	//Mat h2 = findHomography(points_class2, points_ref2, maskm, RANSAC);
+	cv::Mat maskm;
+	Mat h1 = findHomography(points_class1, points_ref1, maskm, RANSAC);
+	Mat h2 = findHomography(points_class2, points_ref2, maskm, RANSAC);
 
 	//if (h1.empty() | h2.empty()) return 0;
 
@@ -578,8 +598,8 @@ int Sift(string str2,cv::Mat &dstMat1, cv::Mat &dstMat2)
 		//warpPerspective(im2, im1Reg, h1, im1.size());
 		//warpPerspective(im2, im2Reg, h2, im1.size());
 
-		warpPerspective(src_im2, im1Reg, h1_0, result1_size);
-		warpPerspective(src_im2, im2Reg, h2_0, result2_size);
+		warpPerspective(im2, im1Reg, h1, im1Gray.size());
+		warpPerspective(im2, im2Reg, h2, im1Gray.size());
 		dstMat1 = im1Reg;
 		dstMat2 = im2Reg;
 		imshow("检测到1", im1Reg);
@@ -684,11 +704,11 @@ int getWaveletCoef(cv::Mat srcMat, cv::Mat &dstMat,double threshold, int coef_di
 int testCutParcelBox()
 {
 	//CutMailBox cutMailBox;
-	string dir = "F:/shared_data_original/side/*.jpg";
+	string dir = "F:/shared_data_original/top/*.jpg";
 	//string dir = "F:/cpte_datasets/Tailand_tag_detection_datasets/Image[2019-8-2]/*.jpg";
 	vector<string> imgfiles;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
-
+	time_t t1, t2;
 	for (int i = 0; i < imgfiles.size(); i++)
 	{
 		//res = OcrAlgorithm::getParcelBoxFromSick(imgfiles[i], r);
@@ -718,7 +738,11 @@ int testCutParcelBox()
 		//CutParcelBoxDll cutbox;
 		cv::Mat resizedMat;
 		//int res = cutbox.getMailBox_Mat(srcmat, resizedMat,0);
-		int res = cutbox.getMailBox_side(srcmat, resizedMat);
+
+		int res = cutbox.getMailBox_Mat(srcmat, resizedMat);
+		clock_t end_t = clock();
+		double timeconsume = (double)(end_t - start_t) / CLOCKS_PER_SEC;
+		cout << "time comsume:" << timeconsume << endl;
 		if (res!=0)
 		{
 			cv::resize(resizedMat, resizedMat, Size(), 0.2, 0.2);
@@ -726,9 +750,8 @@ int testCutParcelBox()
 			
 		}
 
-		clock_t end_t = clock();
-		double timeconsume = (double)(end_t - start_t) / CLOCKS_PER_SEC;
-		cout << "time comsume:" << timeconsume << endl;
+		
+
 
 		//imshow("results", resizedMat);
 
@@ -1003,7 +1026,7 @@ int mirrorImg()
 int testROI()
 {
 	//string dir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_cut_img/hard_work\\*.jpg";
-	string dir = "F:\\detected_data\\tag_1\\*.jpg";
+	string dir = "F:\\detected_data\\ng\\*.jpg";
 	vector<string> imgfiles;
 	clock_t start_t, end_t;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
@@ -1027,7 +1050,7 @@ int testROI()
 
 	for (int i = 0; i < imgfiles.size(); i++)
 	{
-		if (i<19) continue;
+		//if (i<19) continue;
 		cout << endl;
 		start_t = clock();
 		cout << "图片：" << i << endl;
@@ -1196,5 +1219,77 @@ int drawRotateRect(cv::Mat &srcmat, cv::RotatedRect RtRect)
 	cv::Mat resizedMat;
 	cv::resize(srcmat, resizedMat, cv::Size(), scal, scal);
 	cv::imshow("框框", resizedMat);
+	return 1;
+}
+
+int HWdigitsOCR_for_test()
+{
+	vector<string> imgfiles;
+	clock_t start_t, end_t;
+	double alltime = 0;
+	int ncount = 0;
+	string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\王港图像6.28\\顶\\*.jpg";
+	//string dir = "F:\\泰国ocr\\*.jpg";
+	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
+
+	tesseract::TessBaseAPI tess;
+	if (tess.Init("./tessdata", "eng"))
+	{
+		std::cout << "OCRTesseract: Could not initialize tesseract." << std::endl;
+		return 0;
+	}
+	OcrAlgorithm_config ocrCfg;
+	HWDigitsRecog hwdr;
+	int res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v9_dper.pb");
+	if (res == 0)
+	{
+		std::cout << "Handwrite Digits recognition initial fail" << std::endl;
+		return 0;
+	}
+	ocrCfg.pHWDigitsRecog = &hwdr;
+	ocrCfg.pTess = &tess;
+	ocrCfg.HandwriteDigitsConfidence = 0.85;
+	HWDigitsOCR boxocr;
+	int i = 0;
+	int ocr_ok_count = 0;
+	for (i=0;i<imgfiles.size();i++)
+	{
+		cout << "图片：" << i<<endl;
+		//if (i<9) continue;
+
+		cv::Mat srcm,cutm;
+		srcm = imread(imgfiles[i]);
+		CutParcelBox cutb;
+		cutb.getMailBox_Mat(srcm, cutm);
+		Mat sowm;
+		if (cutm.empty())
+		{
+			cout << "图像为空" << endl;
+			continue;
+		}
+		resize(cutm, sowm, cv::Size(), 0.2, 0.2);
+		imshow("cutm",sowm);
+		string ocrstr;
+		int res=0;
+		try
+		{
+			res = boxocr.getPostCode2String_test(cutm, ocrstr, &ocrCfg);
+		}
+		catch (...)
+		{
+			cout << "exception" << endl;
+		}
+
+		if (res!=0)
+		{
+			ocr_ok_count++;
+			cout << "邮编" << ocrstr << endl;
+			waitKey(0);
+		}
+		//waitKey(0);
+	}
+
+	cout << "识别率:" << ocr_ok_count/float(i) << endl;
+
 	return 1;
 }

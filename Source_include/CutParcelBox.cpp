@@ -150,7 +150,7 @@ int CutParcelBox::getMailBox_Mat(cv::Mat &srcMat, cv::Mat &dstMat, int applid_ro
 		CropRect(cv::Rect(0, 0, srcMat.cols, srcMat.rows), mR);
 		rMat = srcMat(mR);
 	}
-	dstMat = rMat;
+	rMat.copyTo(dstMat);
 	return 1;
 }
 
@@ -276,7 +276,7 @@ int CutParcelBox::getMailBox_side(cv::Mat &srcMat, cv::Mat &dstMat, double boxSi
 	int res = getMailBox_side(srcMat, rect_, boxSizeThreshold, binaryThreshold);
 	if (res==1)
 	{
-		dstMat = srcMat(rect_);
+		 srcMat(rect_).copyTo(dstMat);
 	}
 	return res;
 }

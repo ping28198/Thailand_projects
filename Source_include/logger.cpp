@@ -129,9 +129,9 @@ char * Logger::GetCurrentTime()
 	time(&curTime);
 	pTimeInfo = localtime(&curTime);
 	char temp[MAX_STR_LEN] = {0};
-	sprintf(temp, "[%02d时%02d分%02d秒]", pTimeInfo->tm_hour, pTimeInfo->tm_min, pTimeInfo->tm_sec);
+	sprintf(temp, "[%02dh%02dm%02ds]", pTimeInfo->tm_hour, pTimeInfo->tm_min, pTimeInfo->tm_sec);
 	char * pTemp = temp;
-	return pTemp;   
+	return pTemp;
 }
 
 //设置写日志级别
@@ -168,7 +168,7 @@ void Logger::Trace(const char * strInfo)
 		//离开临界区
 		LeaveCriticalSection(&m_cs);
 	}
-	//若发生异常，则先离开临界区，防止死锁
+	//若发生异常，则先离开临界区，防止锁死
 	catch(...)
 	{
 		LeaveCriticalSection(&m_cs);

@@ -71,5 +71,8 @@
     <ClCompile Include="..\..\..\Source_include\ImageProcessFunc.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\Source_include\logger.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

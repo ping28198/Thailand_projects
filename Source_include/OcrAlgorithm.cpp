@@ -16,6 +16,7 @@
 #include <iostream>
 #include <memory>
 #include "ImageProcessFunc.h"
+#include "logger.h"
 using namespace cv;
 using namespace std;
 
@@ -122,11 +123,17 @@ int OcrAlgorithm::getOcrResultString(Mat src_img,tesseract::TessBaseAPI *pTess, 
 			if (res == 0) continue;
 			mstring = pOcrResutls;
 			std::cout << "OCR:" << mstring << std::endl;
-			if (isStanderPostcode(mstring, resultstring))
+			if (isStanderPostcode(mstring, resultstring) == true)
 			{
+
 				return 1;
 			}
 		}
+	}
+
+	if (pConfig->pLogger != NULL)
+	{
+		((Logger*)(pConfig->pLogger))->TraceInfo("Apply sift match!");
 	}
 
 	printf("采用SIFT匹配矫正\n");
@@ -2437,7 +2444,7 @@ double OcrAlgorithm::iou_y(cv::Rect r1, cv::Rect r2)
 bool OcrAlgorithm::isStanderPostcode(std::string srcstr, std::string &postcodestr)
 {
 	double score_ = postcodeStringScore(srcstr, postcodestr);
-	if (score_>=0.5)
+	if (score_ >= 0.5)
 	{
 		return true;
 	}
@@ -2477,31 +2484,42 @@ double OcrAlgorithm::postcodeStringScore(std::string srcStr,std::string &resultS
 	{
 		//判断-号位置，
 		float div_pos_score = (fabs(_pos - srcStr.size() / 2.0)) / srcStr.size() * 2.0;//约往中间得分越低(0-1)
-		if (div_pos_score < 0.75)//-号在中间
-		{
-			std::string substr1 = srcStr.substr(0, _pos);
-			std::string substr2 = srcStr.substr(_pos + 1);
+		//if (div_pos_score < 0.75)//-号在中间
+		//{
+		std::string substr1 = srcStr.substr(0, _pos);
+		std::string substr2 = srcStr.substr(_pos + 1);
 
+		double score_left = continuousDigitsScore(substr1, length_left);
 
-			double score_left = continuousDigitsScore(substr1, length_left);
+		std::string resStr1, resStr2;
+		getFirstContinuousDigits(substr1, length_left, resStr1);
 
-			std::string resStr1,resStr2;
-			getFirstContinuousDigits(substr1, length_left, resStr1);
+		double score_right_5 = continuousDigitsScore(substr2, length_right_5);
+		double score_right_4 = continuousDigitsScore(substr2, length_right_4);
+		double score_right = max(score_right_5, score_right_4);
+		int max_length_ = (score_right_5 < score_right_4) ? length_right_4 : length_right_5;
+		getFirstContinuousDigits(substr2, max_length_, resStr2);
+		resultStr = resStr1 + resStr2;
+		whole_score = score_left * score_right;
 
-			double score_right_5 = continuousDigitsScore(substr2, length_right_5);
-			double score_right_4 = continuousDigitsScore(substr2, length_right_4);
-			double score_right = max(score_right_5, score_right_4);
-			int max_length_ = (score_right_5 < score_right_4) ? length_right_4 : length_right_5;
-			getFirstContinuousDigits(substr2, max_length_, resStr2);
-			resultStr = resStr1 + resStr2;
-			whole_score = score_left * score_right;
-
-			return whole_score;
-		}
+		return whole_score;
+		//}
 	}
 
 	//////////////////////////////////////////////////////////////////////////
-	//没有找到-号的情况
+	//没有找到正确的-号的情况
+	//for (int i = 0; i < srcStr.length();)//剔除空格
+	//{
+	//	unsigned char c = srcStr.at(i);
+	//	if (c == '-')
+	//	{
+	//		srcStr.erase(i, 1);
+	//	}
+	//	else
+	//	{
+	//		i++;
+	//	}
+	//}
 
 	//是否考虑-被识别为空格的情况。。。待定
 	double score_l_r5 = continuousDigitsScore(srcStr, length_left+ length_right_5);
@@ -2511,7 +2529,7 @@ double OcrAlgorithm::postcodeStringScore(std::string srcStr,std::string &resultS
 	int max_i = 0;
 	if (score_l_r4 > score_l_r5)
 	{
-		if (score_l_r4 >= score_r5)
+		if (score_l_r4 > score_r5)
 		{
 			getFirstContinuousDigits(srcStr, length_left + length_right_4, resultStr);
 			whole_score = score_l_r4;
@@ -2525,7 +2543,7 @@ double OcrAlgorithm::postcodeStringScore(std::string srcStr,std::string &resultS
 	}
 	else
 	{
-		if (score_l_r5 >= score_r5)
+		if (score_l_r5 > score_r5)
 		{
 			getFirstContinuousDigits(srcStr, length_left + length_right_5, resultStr);
 			whole_score = score_l_r5;
@@ -2739,7 +2757,7 @@ double OcrAlgorithm::continuousDigitsScore(std::string srcStr, int continus_num)
 
 	for (int i = 0; i < srcStr.length();)//剔除空格
 	{
-		char c = srcStr.at(i);
+		unsigned char c = srcStr.at(i);
 		if (c == ' ' || c == '-')
 		{
 			srcStr.erase(i, 1);
@@ -2839,7 +2857,7 @@ size_t OcrAlgorithm::getFirstContinuousDigits(std::string srcStr, int conti_num,
 					if (j-i+1 == conti_num)
 					{
 						dstStr = srcStr.substr(i, conti_num);
-						return j + 1;
+						return 1;
 					}
 				}
 				else
@@ -2855,7 +2873,7 @@ size_t OcrAlgorithm::getFirstContinuousDigits(std::string srcStr, int conti_num,
 		}
 
 	}
-	return srcStr.npos;
+	return 0;
 }
 
 int MatchDataStruct::loadMatchData(const std::string &xmlfile)
@@ -3555,13 +3573,20 @@ int HWDigitsOCR::getPostCode2String(cv::Mat srcImg, std::string &postcode, OcrAl
 	for (int i = 0; i < AddrRangeMat_vec.size(); i++)
 	{
 		cv::Mat mt;
-		//imshow("addr_range", AddrRangeMat_vec[i]);
+#ifdef POSTCODE_BOX_DEBUG
+		imshow("addr_range"+ std::to_string(i), AddrRangeMat_vec[i]);
+#endif // POSTCODE_BOX_DEBUG
+
 		res = rotateImage(AddrRangeMat_vec[i], mt);
 		if (res == 0)
 		{
 			std::cout << "旋转图像失败" << std::endl;
 			continue;
 		}
+#ifdef POSTCODE_BOX_DEBUG
+		imshow("addr_range_rotate" + std::to_string(i), mt);
+#endif // POSTCODE_BOX_DEBUG
+
 		res = getPostcodeLine(mt, refMat, postcodeLineMat);
 		if (res == 0)
 		{
@@ -3631,6 +3656,120 @@ int HWDigitsOCR::getPostCode2String(cv::Mat srcImg, std::string &postcode, OcrAl
 	}
 
 	return 1;
+}
+
+
+
+int HWDigitsOCR::getPostCode2String_test(cv::Mat srcMat, std::string &postcode, OcrAlgorithm_config* pConfig)
+{
+	if (srcMat.empty())
+	{
+		return 0;
+	}
+	//Mat fromMat, toMat;
+	if (srcMat.rows > srcMat.cols) cv::rotate(srcMat, srcMat, ROTATE_90_CLOCKWISE);//旋转图片
+	vector<Mat> toMats, fromMats;
+	int res = getPostCodeLine_nobox(srcMat, toMats, fromMats);
+	if (res == 0)
+	{
+		return 0;
+	}
+#ifdef POSTCODE_BOX_DEBUG
+	for (int i=0;i<fromMats.size();i++)
+	{
+		imshow("FromMat" + to_string(i), fromMats[i]);
+	}
+	for (int i = 0; i < toMats.size(); i++)
+	{
+		imshow("ToMat" + to_string(i), toMats[i]);
+	}
+
+#endif // POSTCODE_BOX_DEBUG
+
+	vector<Mat> to_digits_vec;
+	for (int i=0;i<toMats.size();i++)
+	{
+		res = split_digits_nobox(toMats[i], to_digits_vec);
+		if (res ==0 )
+		{
+			continue;
+		}
+	}
+	vector<Mat> from_digits_vec;
+	for (int i = 0; i < fromMats.size(); i++)
+	{
+		res = split_digits_nobox(fromMats[i], from_digits_vec);
+		if (res == 0)
+		{
+			continue;
+		}
+	}
+	if (to_digits_vec.empty())
+	{
+		cout << "未找到目的地邮编！" << endl;
+		return 0;
+	}
+	vector<string> to_code_vec;
+	vector<float> to_confidence_vec;
+	vector<string> from_code_vec;
+	vector<float> from_confidence_vec;
+	getPostCode_nobox(to_digits_vec, to_code_vec, to_confidence_vec, pConfig);
+
+	float confidence = pConfig->HandwriteDigitsConfidence;
+	int code_index = -1;
+	float tem_confidence = 0;
+	for (int i=0;i<to_confidence_vec.size();i++)
+	{
+		if (tem_confidence < to_confidence_vec[i] && to_confidence_vec[i] >= confidence)
+		{
+			code_index = i;
+			tem_confidence = to_confidence_vec[i];
+		}
+	}
+	string to_postcode, from_postcode;
+	if (code_index!=-1)
+	{
+		to_postcode = to_code_vec[code_index];
+	}
+	else
+	{
+		cout << "目的地邮编置信度较低" << endl;
+		return 0;
+	}
+
+
+	if (!from_digits_vec.empty())
+	{
+		getPostCode_nobox(from_digits_vec, from_code_vec, from_confidence_vec, pConfig);
+	}
+	tem_confidence = 0;
+	code_index = -1;
+	for (int i = 0; i < from_confidence_vec.size(); i++)
+	{
+		if (tem_confidence < from_confidence_vec[i] && from_confidence_vec[i] >= confidence)
+		{
+			code_index = i;
+			tem_confidence = from_confidence_vec[i];
+		}
+	}
+	if (code_index != -1)
+	{
+		from_postcode = from_code_vec[code_index];
+	}
+
+
+	if (from_postcode.empty())
+	{
+		postcode = to_postcode;
+		return 1;
+	}
+	else
+	{
+		postcode = from_postcode + "-" + to_postcode;
+		return 2;
+	}
+	
+	
 }
 
 int HWDigitsOCR::rotateImage(const cv::Mat &srcMat, cv::Mat &dstMat)
@@ -3703,12 +3842,14 @@ int HWDigitsOCR::rotateImage(const cv::Mat &srcMat, cv::Mat &dstMat)
 	}
 
 
+#ifdef POSTCODE_BOX_DEBUG
 	for (size_t i = 0; i < lines_std.size(); i++)
 	{
 		cv::line(srcMat_g, Point(lines_std[i][0], lines_std[i][1]),
-			Point(lines_std[i][2], lines_std[i][3]), Scalar(255, 255, 255), 1, 8);
+			Point(lines_std[i][2], lines_std[i][3]), Scalar(255, 255, 255), 2, 8);
 	}
-	//imshow("lines", srcMat_g);
+	imshow("lines", srcMat_g);
+#endif // POSTCODE_BOX_DEBUG
 
 
 
@@ -4630,7 +4771,6 @@ int HWDigitsOCR::query_near_count(std::vector<float> &datas, float down_value, f
 {
 	std::vector<float> m_data = datas;
 	std::sort(m_data.begin(), m_data.end());
-
 	std::vector<float>::iterator it;
 	it = m_data.begin();
 	int count_ = 0;
@@ -4645,9 +4785,698 @@ int HWDigitsOCR::query_near_count(std::vector<float> &datas, float down_value, f
 		{
 			count_++;
 		}
+	}
+	return count_;
+}
+
+int HWDigitsOCR::score_for_rect(std::vector<cv::Rect> rcs, int im_width, int im_height, std::vector<float> &rc_scores)
+{
+	const int ref_width = 200;
+	const float ref_ratio = 7;
+	const int ref_height_up = 35;
+	const int ref_height_down = 10;
+
+	for (int i=0;i<rcs.size();i++)
+	{
+		float score_ = 1;
+		int c_x = rcs[i].x + rcs[i].width / 2;
+		int c_y = rcs[i].y + rcs[i].height / 2;
+		if ((c_x>im_width/2 && c_y<im_height/2) ||(c_x<im_width/2 && c_y>im_height/2))
+		{
+			rc_scores.push_back(0);
+			continue;
+		}
+		if (rcs[i].height>ref_height_up || rcs[i].height < ref_height_down )
+		{
+			rc_scores.push_back(0);
+			continue;
+		}
+		float _ratio = float(rcs[i].width) / rcs[i].height;
+		float score_tmp = 1 - fabs(_ratio - ref_ratio) / ref_ratio; //长宽比打分
+		score_tmp = (score_tmp < 0) ? 0 : score_tmp;
+		score_ *= score_tmp;
+
+		rc_scores.push_back(score_);
+
 
 	}
 
-	return count_;
+	return 1;
+}
+
+int HWDigitsOCR::getPostCodeLine_nobox(cv::Mat srcMat, std::vector<cv::Mat> &toMats, std::vector<cv::Mat> &fromMats)
+{
+	if (srcMat.empty()) return 0;
+
+	Mat grymat;
+
+	float scal_max2 = 1000.0 / max(srcMat.cols, srcMat.rows);
+
+	cv::resize(srcMat, grymat, cv::Size(), scal_max2, scal_max2, cv::INTER_AREA);
+
+	if (grymat.channels() == 3) cvtColor(grymat, grymat, COLOR_BGR2GRAY);
+
+	//if (grymat.rows > grymat.cols) cv::rotate(grymat, grymat,ROTATE_90_CLOCKWISE);//旋转图片
+
+	//imshow("srcm", grymat);
+
+	if (grymat.rows < 200 || grymat.cols < 200) return 0;
+
+	
+	//Rect cr(bord_wd, 0, grymat.cols - 2 * bord_wd, grymat.rows);
+	Rect cr_sample(grymat.cols*0.2, grymat.rows*0.1, grymat.cols*0.6, grymat.rows*0.4);
+
+	//imshow("srcm2", centm);
+	double avg_pix = ImageProcessFunc::getAveragePixelInRect(grymat, cr_sample);
+
+	Mat bnmat;
+	cv::threshold(grymat, bnmat, avg_pix / 1.5, 255, CV_THRESH_BINARY);
+	bnmat = ~bnmat;
+
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("bnmat", bnmat);
+#endif // POSTCODE_BOX_DEBUG
+
+
+	cv::Mat element;
+	element = getStructuringElement(MORPH_RECT, Size(5, 20));
+	morphologyEx(bnmat, bnmat, MORPH_CLOSE, element);
+	element = getStructuringElement(MORPH_RECT, Size(50, 5));
+	morphologyEx(bnmat, bnmat, MORPH_CLOSE, element);
+
+	element = getStructuringElement(MORPH_RECT, Size(1, 5));
+	morphologyEx(bnmat, bnmat, MORPH_OPEN, element);
+
+
+	element = getStructuringElement(MORPH_RECT, Size(3, 3));
+	morphologyEx(bnmat, bnmat, MORPH_ERODE, element);
+
+
+
+
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("morpmat", bnmat);
+#endif // POSTCODE_BOX_DEBUG
+
+	//裁切掉黑边
+	vector<unsigned int> sum_pixels;
+	ImageProcessFunc::sumPixels(bnmat, 0, sum_pixels);
+	int iw = bnmat.cols;
+	int cut_line_up = 0;
+	for (int i = 0; i < sum_pixels.size(); i++)
+	{
+		int avpix = sum_pixels[i] / iw;
+		if (avpix >= 127)
+		{
+			cut_line_up++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	int cut_line_down = 0;
+	for (int i = sum_pixels.size() - 1; i >= 0; i--)
+	{
+		int avpix = sum_pixels[i] / iw;
+		if (avpix >= 120)
+		{
+			cut_line_down++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	if ((cut_line_down + cut_line_up) > (bnmat.rows / 2))
+	{
+		cout << "裁切上下异常" << endl;
+		return 0;
+	}
+	Rect rc_tb_cut(0, 0, bnmat.cols, bnmat.rows);
+	if (cut_line_down != 0 || cut_line_up != 0)
+	{
+		rc_tb_cut.y = cut_line_up;
+		rc_tb_cut.height = rc_tb_cut.height - (cut_line_up + cut_line_down);
+	}
+	bnmat = bnmat(rc_tb_cut);
+
+	vector<unsigned int>().swap(sum_pixels);
+	ImageProcessFunc::sumPixels(bnmat, 1, sum_pixels);
+	int ih = bnmat.rows;
+	int cut_line_left = 0;
+	for (int i = 0; i < sum_pixels.size(); i++)
+	{
+		int avpix = sum_pixels[i] / ih;
+		if (avpix >= 127)
+		{
+			cut_line_left++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	int cut_line_right = 0;
+	for (int i = sum_pixels.size() - 1; i >= 0; i--)
+	{
+		int avpix = sum_pixels[i] / ih;
+		if (avpix >= 127)
+		{
+			cut_line_right++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	if ((cut_line_left + cut_line_right) > (bnmat.cols / 2))
+	{
+		cout << "裁切左右异常" << endl;
+		return 0;
+	}
+	Rect rc_lr_cut(0, 0, bnmat.cols, bnmat.rows);
+	if (cut_line_down != 0 || cut_line_up != 0)
+	{
+		rc_lr_cut.x =cut_line_left;
+		rc_lr_cut.width = rc_lr_cut.width - (cut_line_left + cut_line_right);
+	}
+	bnmat = bnmat(rc_lr_cut);
+
+
+
+	////imshow("cut_tb", bnmat);
+
+	//获得轮廓的rect
+	std::vector<std::vector<cv::Point>>contours;
+	std::vector<cv::Vec4i> hierarchy;
+	std::vector<cv::Point> contour;
+	double aera = 0;
+	//src_gray = src_gray > 100;
+	cv::findContours(bnmat, contours, hierarchy, RETR_LIST, CV_CHAIN_APPROX_SIMPLE);
+	vector<float> contours_score;
+	vector<Rect> contours_rect;
+	if (contours.size()==0)
+	{
+		return 0;
+	}
+	for (int i = 0; i < contours.size(); i++)
+	{
+		Rect _rc;
+		ImageProcessFunc::getContourRect(contours[i], _rc);
+		double maera = cv::contourArea(contours[i]);
+		if (_rc.width*_rc.height*0.5 > maera)//轮廓面积只有rect面积的1/2，弃掉
+		{
+			continue;
+		}
+		//rectangle(bnmat, _rc, Scalar(125, 125, 125));
+		contours_rect.push_back(_rc);
+	}
+	score_for_rect(contours_rect, bnmat.cols, bnmat.rows, contours_score);
+
+	//查找评分大于阈值的rect
+	float score_threshold = 0.3;//评分阈值
+	vector<cv::Rect> candidate_rects;
+	for (int i = 0; i < contours_score.size(); i++)
+	{
+		if (contours_score[i] < score_threshold)
+		{
+			continue;
+		}
+		candidate_rects.push_back(contours_rect[i]);
+	}
+
+	if (candidate_rects.empty())
+	{
+		cout << "没有找到合适的候选框" << endl;
+		return 0;
+	}
+
+	//拆分rect
+	vector<cv::Rect> candidate_lt_rects; //左上角
+	vector<cv::Rect> candidate_rb_rects; //右下角
+	for (int i=0;i<candidate_rects.size();i++)
+	{
+		if ((candidate_rects[i].x+candidate_rects[i].width/2)<bnmat.cols/2
+			|| (candidate_rects[i].y + candidate_rects[i].height / 2) < bnmat.rows / 2)
+		{
+			candidate_lt_rects.push_back(candidate_rects[i]);
+		}
+		else
+		{
+			candidate_rb_rects.push_back(candidate_rects[i]);
+		}
+	}
+
+	rc_lr_cut.x /= scal_max2;
+	rc_lr_cut.y /= scal_max2;
+	rc_lr_cut.height /= scal_max2;
+	rc_lr_cut.width /= scal_max2;
+
+	rc_tb_cut.x /= scal_max2;
+	rc_tb_cut.y /= scal_max2;
+	rc_tb_cut.width /= scal_max2;
+	rc_tb_cut.height /= scal_max2;
+
+
+	//获取候选的框
+	vector<cv::Mat> fromMatVec;
+	vector<cv::Mat> toMatVec;
+	for (int i=0;i<candidate_lt_rects.size();i++)
+	{
+		cv::Rect refinedRect = candidate_lt_rects[i];
+		refinedRect.x /= scal_max2;
+		refinedRect.y /= scal_max2;
+		refinedRect.width /= scal_max2;
+		refinedRect.height /= scal_max2;
+		bool needRotate = false;
+		getHandWriteRange(srcMat(rc_tb_cut)(rc_lr_cut), refinedRect, refinedRect, needRotate);
+		cv::Mat candi_mat = srcMat(rc_tb_cut)(rc_lr_cut)(refinedRect);
+		if (needRotate)
+		{
+			cv::rotate(candi_mat, candi_mat, ROTATE_180);
+			toMatVec.push_back(candi_mat);
+		}
+		else
+		{
+			candi_mat = candi_mat.clone();
+			fromMatVec.push_back(candi_mat);
+		}
+
+	}
+
+	for (int i = 0; i < candidate_rb_rects.size(); i++)
+	{
+		cv::Rect refinedRect = candidate_rb_rects[i];
+		refinedRect.x /= scal_max2;
+		refinedRect.y /= scal_max2;
+		refinedRect.width /= scal_max2;
+		refinedRect.height /= scal_max2;
+		bool needRotate = false;
+		getHandWriteRange(srcMat(rc_tb_cut)(rc_lr_cut), refinedRect, refinedRect, needRotate);
+		cv::Mat candi_mat = srcMat(rc_tb_cut)(rc_lr_cut)(refinedRect);
+		if (needRotate)
+		{
+			cv::rotate(candi_mat, candi_mat, ROTATE_180);
+			fromMatVec.push_back(candi_mat);
+		}
+		else
+		{
+			candi_mat = candi_mat.clone();
+			toMatVec.push_back(candi_mat);
+		}
+
+	}
+	toMatVec.swap(toMats);
+	fromMatVec.swap(fromMats);
+
+
+
+	/*
+	   	  
+	cout << "best socre:" << best_score_tmp << "/" << best_score_tmp2 << endl;
+	if (best_ind1 == -1 && best_ind2 == -1)//未找到合适的框
+	{
+		cout << "没有找到合适的rect" << endl;
+		return 0;
+	}
+	if (best_ind1 != -1 && best_ind2 != -1)//找到两个rect
+	{
+		//如果两个rect在同一区域
+		if (((contours_rect[best_ind1].x+ contours_rect[best_ind1].width / 2) < bnmat.cols / 2) 
+			== ((contours_rect[best_ind2].x + contours_rect[best_ind2].width / 2) < bnmat.cols / 2))
+		{
+			best_ind2 = -1;
+		}
+	}
+	if ((contours_rect[best_ind1].x + contours_rect[best_ind1].width / 2) > bnmat.cols / 2)//
+	{
+		int tmp = best_ind1;
+		best_ind1 = best_ind2;
+		best_ind2 = tmp;
+	}
+
+
+#ifdef POSTCODE_BOX_DEBUG
+	Mat mshow = bnmat.clone();
+	if(best_ind1!=-1) rectangle(mshow, contours_rect[best_ind1], Scalar(125, 125, 125));
+	if (best_ind2 != -1) rectangle(mshow, contours_rect[best_ind2], Scalar(125, 125, 125));
+	imshow("rect", mshow);
+#endif // POSTCODE_BOX_DEBUG
+
+	rc_lr_cut.x /= scal_max2;
+	rc_lr_cut.y /= scal_max2;
+	rc_lr_cut.height /= scal_max2;
+	rc_lr_cut.width /= scal_max2;
+
+	rc_tb_cut.x /= scal_max2;
+	rc_tb_cut.y /= scal_max2;
+	rc_tb_cut.width /= scal_max2;
+	rc_tb_cut.height /= scal_max2;
+
+	bool is_rotate1 = false;
+	bool is_rotate2 = false;
+	cv::Mat m_from_mat, m_to_mat;
+	Rect best_rect1_refine;
+	Rect best_rect2_refine;
+	if (best_ind1!=-1)
+	{
+		best_rect1_refine = contours_rect[best_ind1];
+		best_rect1_refine.x /= scal_max2;
+		best_rect1_refine.y /= scal_max2;
+		best_rect1_refine.width /= scal_max2;
+		best_rect1_refine.height /= scal_max2;
+		getHandWriteRange(srcMat(rc_tb_cut)(rc_lr_cut), best_rect1_refine, best_rect1_refine,is_rotate1);
+		m_from_mat = srcMat(rc_tb_cut)(rc_lr_cut)(best_rect1_refine);
+	}
+	if (best_ind2 != -1)
+	{
+		best_rect2_refine = contours_rect[best_ind2];
+		best_rect2_refine.x /= scal_max2;
+		best_rect2_refine.y /= scal_max2;
+		best_rect2_refine.width /= scal_max2;
+		best_rect2_refine.height /= scal_max2;
+		getHandWriteRange(srcMat(rc_tb_cut)(rc_lr_cut), best_rect2_refine, best_rect2_refine, is_rotate2);
+		m_to_mat = srcMat(rc_tb_cut)(rc_lr_cut)(best_rect2_refine);
+	}
+	if (best_ind1 != -1 && best_ind2 != -1)
+	{
+		int top2rect1 = contours_rect[best_ind1].y + contours_rect[best_ind1].height / 2;
+		int bottom2rect2 = bnmat.rows - (contours_rect[best_ind2].y + contours_rect[best_ind2].height / 2);
+		int left2rect1 = contours_rect[best_ind1].x + contours_rect[best_ind1].width / 2;
+		int right2rect2 = bnmat.cols - (contours_rect[best_ind2].x + contours_rect[best_ind2].width / 2);
+		float pos_rate_y = float(top2rect1) / bottom2rect2;
+		float pos_rate_x = float(left2rect1) / right2rect2;
+		if (pos_rate_y < 0.75 || pos_rate_x < 0.75)
+		{
+			cv::rotate(m_from_mat, m_from_mat, ROTATE_180);
+			cv::rotate(m_to_mat, m_to_mat, ROTATE_180);
+			m_from_mat.copyTo(toMat);
+			m_to_mat.copyTo(fromMat);
+		}
+		else
+		{
+			m_from_mat.copyTo(fromMat);
+			m_to_mat.copyTo(toMat);
+		}
+
+	}
+	else
+	{
+		if (is_rotate2 || is_rotate1)
+		{
+			if (!m_from_mat.empty())
+			{
+				cv::rotate(m_from_mat, m_from_mat, ROTATE_180);
+				m_from_mat.copyTo(toMat);
+			}
+			if (!m_to_mat.empty())
+			{
+				cv::rotate(m_to_mat, m_to_mat, ROTATE_180);
+				m_to_mat.copyTo(fromMat);
+			}
+		}
+		else
+		{
+			m_from_mat.copyTo(fromMat);
+			m_to_mat.copyTo(toMat);
+		}
+	}
+	*/
+	return 1;
+}
+
+
+
+int HWDigitsOCR::getHandWriteRange(cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect &dstRect, bool &need_rotate)
+{
+	if (srcMat.empty()) return 0;
+	if (srcMat.channels() == 3)
+	{
+		cv::cvtColor(srcMat, srcMat, COLOR_BGR2GRAY);
+	}
+
+
+	Rect best_rect1_refine = srcRect;
+	//Rect best_rect2_refine = contours_rect[best_ind2];
+
+	float zoom_scal_x = 1.5;
+	float zoom_scal_y = 2.0;
+
+	best_rect1_refine.width = best_rect1_refine.width*zoom_scal_x;
+	best_rect1_refine.height = best_rect1_refine.height*zoom_scal_y;
+	best_rect1_refine.x = best_rect1_refine.x - srcRect.width*(zoom_scal_x - 1) / 2;
+	best_rect1_refine.y = best_rect1_refine.y - srcRect.height*(zoom_scal_y - 1) / 2;
+
+
+	int res = ImageProcessFunc::CropRect(Rect(0, 0, srcMat.cols, srcMat.rows), best_rect1_refine);
+	if (res == 0) return 0;
+
+	dstRect = best_rect1_refine;
+
+	//检查是否旋转
+	int top2rect1 = best_rect1_refine.y + best_rect1_refine.height / 2;
+	int left2rect1 = best_rect1_refine.x + best_rect1_refine.width / 2;
+	int bottom2rect1 = srcMat.rows - top2rect1;
+	int right2rect1 = srcMat.cols - left2rect1;
+
+	if (top2rect1<bottom2rect1)
+	{
+		if (top2rect1 < srcMat.rows / 4 && left2rect1 < srcMat.cols / 4)
+		{
+			need_rotate = true;
+		}
+		else
+		{
+			need_rotate = false;
+		}
+	}
+	else
+	{
+		if (bottom2rect1 > srcMat.rows / 4 && right2rect1 > srcMat.cols / 4)
+		{
+			need_rotate = true;
+		}
+		else
+		{
+			need_rotate = false;
+		}
+	}
+
+	return 1;
+
+}
+
+int HWDigitsOCR::split_digits_nobox(cv::Mat &srcMat, std::vector<cv::Mat> &dstDigits)
+{
+	if (srcMat.empty())
+	{
+		return 0;
+	}
+	if (srcMat.channels()==3)
+	{
+		cvtColor(srcMat, srcMat, COLOR_BGR2GRAY);
+	}
+
+	float avg_pix = ImageProcessFunc::getAverageBrightness(srcMat);
+	Mat adj_mat = srcMat.clone();
+	ImageProcessFunc::adJustBrightness(adj_mat, 10, 0, avg_pix/2.0);
+	adj_mat = ~adj_mat;
+	
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("digits", adj_mat);
+#endif // POSTCODE_BOX_DEBUG
+
+	vector<unsigned int> sum_pixs;
+	ImageProcessFunc::sumPixels(adj_mat, 1, sum_pixs);
+
+	int ih = adj_mat.rows;
+	vector<Point> seg_points_x;
+	bool start_flag = false;
+	Point pt;
+	for (size_t i = 0; i < sum_pixs.size(); i++)
+	{
+		int _p = sum_pixs[i] / ih;
+		if (_p > 3 && start_flag==false)
+		{
+			pt.x = i;
+			start_flag = true;
+		}
+		if (_p <=3 && start_flag==true)
+		{
+			pt.y = i;
+			seg_points_x.push_back(pt);
+			start_flag = false;
+		}
+	}
+	//if (seg_points_x.size() != 5)
+	//{
+	//	cout << "分割数字失败" << endl;
+	//	return 0;
+	//}
+	vector<Rect> seg_rects;
+	for (size_t i = 0; i < seg_points_x.size(); i++)
+	{
+		Rect _rc(seg_points_x[i].x, 0, seg_points_x[i].y - seg_points_x[i].x, adj_mat.rows);
+		int iw = _rc.width;
+		vector<unsigned int> sum_pixs;
+		ImageProcessFunc::sumPixels(adj_mat(_rc), 0, sum_pixs);
+		Point pt;
+		for (size_t j = 0; j < sum_pixs.size(); j++)
+		{
+			int _p = sum_pixs[j] / iw;
+			if (_p > 10 )
+			{
+				pt.x = j;
+				break;
+			}
+		}
+		for (size_t j = sum_pixs.size()-1; j >= 0 ; j--)
+		{
+			int _p = sum_pixs[j] / iw;
+			if (_p > 10)
+			{
+				pt.y = j;
+				break;
+			}
+		}
+		if (pt.x == pt.y)
+		{
+			cout << "分割数字失败" << endl;
+			return 0;
+		}
+		_rc.y = pt.x;
+		_rc.height = pt.y - pt.x + 1;
+		seg_rects.push_back(_rc);
+	}
+
+	//过滤rect
+	if (seg_rects.size()<5)
+	{
+		cout << "分割数字失败" << endl;
+		return 0;
+	}
+	if (seg_rects.size() > 5)
+	{
+		vector<Rect>::iterator it = seg_rects.begin();
+		int area_threshold = 50;
+		for (;it!=seg_rects.end();)
+		{
+			if (it->area() < area_threshold)
+			{
+				it = seg_rects.erase(it);
+			}
+			else
+			{
+				it++;
+			}
+		}
+	}
+#ifdef POSTCODE_BOX_DEBUG
+	Mat mshow = adj_mat.clone();
+	for (size_t i = 0; i < seg_rects.size(); i++)
+	{
+		rectangle(mshow, seg_rects[i], Scalar(150, 150, 150));
+	}
+	imshow("adj_mat", mshow);
+#endif // POSTCODE_BOX_DEBUG
+
+
+	if (seg_rects.size() != 5)
+	{
+		cout << "分割数字失败" << endl;
+		return 0;
+	}
+
+	//调整rect尺寸
+	for (size_t i = 0; i < seg_rects.size(); i++)
+	{
+		Rect _rc = seg_rects[i];
+		int bd = 3;
+		_rc.x -= bd;
+		_rc.y -= bd;
+		_rc.width += 2 * bd;
+		_rc.height += 2 * bd;
+		if (_rc.width<_rc.height)
+		{
+			int cent_x = _rc.x + _rc.width / 2;
+			_rc.width = _rc.height;
+			_rc.x = cent_x - _rc.width / 2;
+		}
+		if (_rc.width > _rc.height)
+		{
+			int cent_y = _rc.y + _rc.height / 2;
+			_rc.height = _rc.width;
+			_rc.y = cent_y - _rc.height / 2;
+		}
+		ImageProcessFunc::CropRect(Rect(0, 0, adj_mat.cols, adj_mat.rows), _rc);
+		seg_rects[i] = _rc;
+	}
+	Mat cropMat = srcMat.clone();
+	ImageProcessFunc::adJustBrightness(cropMat, 10, 0, avg_pix / 1.4);
+	cropMat = ~cropMat;
+
+
+	for (size_t i = 0; i < seg_rects.size(); i++)
+	{
+		Mat _m = cropMat(seg_rects[i]);
+		cv::resize(_m, _m, cv::Size(28, 28));
+		dstDigits.push_back(_m.clone());
+	}
+	return 1;
+}
+
+int HWDigitsOCR::getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector<std::string> &result_str, std::vector<float> &confidence, OcrAlgorithm_config* pConfig)
+{
+	if (srcMat_vec.size() == 0) return 0;
+	std::vector<cv::Mat> m_vec = srcMat_vec;
+
+	std::vector<int> class_vec;
+	std::vector<float> configdenc_vec;
+
+#ifdef POSTCODE_BOX_DEBUG
+	cv::Mat showMat(cv::Size(m_vec.size() * 28, 28), CV_8UC1);
+	for (int i = 0; i < m_vec.size(); i++)
+	{
+		cv::Rect r(i * 28, 0, 28, 28);
+		m_vec[i].copyTo(showMat(r));
+	}
+	imshow("post_code_boxes", showMat);
+#endif // POSTCODE_BOX_DEBUG
+
+	//imshow("s", m_vec[4]);
+	//	waitKey(0);
+	//}
+	HWDigitsRecog *pRecogor = (HWDigitsRecog *)(pConfig->pHWDigitsRecog);
+	pRecogor->detect_mat(m_vec, class_vec, configdenc_vec);
+
+#ifdef POSTCODE_BOX_DEBUG
+	std::cout << "OCR结果:";
+	for (int i = 0; i < class_vec.size(); i++)
+	{
+		cout << class_vec[i] << "@" << configdenc_vec[i] << "   ";
+	}
+	std::cout << endl;
+#endif // POSTCODE_BOX_DEBUG
+
+	int postcodeline_num = class_vec.size() / 5;
+
+
+	for (int i=0;i<postcodeline_num;i++)
+	{
+
+		std::string res_str;
+		float m_configence = 1;
+		for (int j = 0; j < 5; j++)
+		{
+			res_str.append(std::to_string(class_vec[i+j]));
+			m_configence *= configdenc_vec[i+j];
+		}
+		result_str.push_back(res_str);
+		confidence.push_back(m_configence);
+
+	}
+
+	return postcodeline_num;
 
 }

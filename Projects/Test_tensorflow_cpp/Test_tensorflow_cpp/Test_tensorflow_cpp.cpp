@@ -37,12 +37,12 @@ int main() {
 	//char *pexeFullp = CT2A(exeFullPath);
 	//std::string imgNamestring = pexeFullp;
 
-	//test_HDR_digits();
+	test_HDR_digits();
 	//cutImageOnMouse();
 
 
 
-	detectAllImages();
+	//detectAllImages();
 
 }
 

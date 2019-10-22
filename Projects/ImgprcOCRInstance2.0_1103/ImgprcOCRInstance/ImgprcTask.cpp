@@ -2,6 +2,7 @@
 #include "ImgprcTask.h"
 #include "atlconv.h"
 #include <random>
+#include <imagehlp.h>
 //#include "CutParcelBoxDll.h"
 #include "CutParcelBox.h"
 //ImgprcTask
@@ -172,7 +173,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	//std::string localimgpath = std::string(this->m_chsLocalImgPath);
 	if (localimgpath.empty())
 	{
-		pLogger->TraceWarning("图片路径为空！");
+		pLogger->TraceWarning("Image path is empty!");
 		this->m_postcodeNum = 0;
 		return 0;
 	}
@@ -181,7 +182,8 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	cv::Mat src_img = cv::imread(localimgpath);
 	if (src_img.empty())
 	{
-		pLogger->TraceWarning("图片为空！");
+		string _logstr = "Image is empty! Imagepath:" + localimgpath;
+		pLogger->TraceWarning(_logstr.c_str());
 		this->m_postcodeNum = 0;
 		return 0;
 	}
@@ -191,7 +193,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	{
 		int isparcel = cutparcel.getMailBox_Mat(src_img, src_img,0);
 		if (isparcel == 0) {
-			pLogger->TraceInfo("没有包裹");
+			pLogger->TraceInfo("No parcel");
 			return 0;
 		}
 	}
@@ -199,7 +201,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	{
 		int isparcel = cutparcel.getMailBox_side(src_img, src_img);
 		if (isparcel == 0) {
-			pLogger->TraceInfo("没有包裹");
+			pLogger->TraceInfo("No parcel");
 			return 0;
 		}
 	}
@@ -256,16 +258,25 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 		}
 		catch (...)
 		{
-			pLogger->TraceWarning("捕捉到ocr算法异常！");
+			pLogger->TraceWarning("OCR algorithm exception!");
 			continue;
 		}
-		 
-		if (res == 0)
+
+		if (res == 0 || post_str.empty())
 		{
-			pLogger->TraceInfo("OCR未识别到结果！");
-			this->m_postcodeNum = 0;
-			string save_ng_file = "./saved_ng_file/";
 			int mid = mtime % 5000;
+			string save_ng_file = "./saved_ng_file/";
+
+			if (post_str.empty() && res !=0)
+			{
+				pLogger->TraceWarning("Postcode is empty but should not!");
+				sprintf_s(mstr, "ng_%d.jpg", mid);
+				save_ng_file.append(mstr);
+				imwrite(save_ng_file, tag_roi);
+				continue;
+			}
+			pLogger->TraceInfo("OCR result is empty");
+			//this->m_postcodeNum = 0;
 			sprintf_s(mstr, "%d.jpg", mid);
 			save_ng_file.append(mstr);
 			imwrite(save_ng_file, tag_roi);
@@ -307,13 +318,14 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 
 	if (img_num != this->m_image_num)
 	{
-		sprintf_s(loginfo, "任务指定的图片数量和路径数量不相符！指定数量为：%d,路径数量为：%d", this->m_image_num, img_num);
+		sprintf_s(loginfo, "Image number from the task is not equal to it from path! task:%d, path:d", this->m_image_num, img_num);
 		this->m_image_num = img_num;
 		pLogger->TraceWarning(loginfo);
 	}
 
 	int post_index_image = 0; //邮编所在图像索引
 	clock_t end_t, mtime;
+
 	//对每张图片运行算法(目前仅有一张图片)
 	mtime = clock();
 	for (int i=0;i< this->m_image_num;i++)
@@ -321,7 +333,7 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 		std::vector<std::string> post_code_vec;
 		int post_num = 0;
 		bool isTopView = (this->m_isTopViewImage == 1 && i == 0) ? true : false;
-		switch (this->m_processType)
+		switch (this->m_processType)//处理类型
 		{
 		case ST_TASK_PROC_TAG:
 			post_num = GetPostcode_v2(image_pathes[i], isTopView, pOcrConifg, pLogger, post_code_vec);
@@ -332,13 +344,17 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 		default:
 			break;
 		}
-		this->m_postcodeNum += post_num;
 		for (int j=0;j< post_num;j++)
 		{
+			if (this->m_postcodeNum!=0)
+			{
+				strcat(this->m_chsOcrPostcode, ";");
+			}
 			post_index_image = i+1;
 			strcat(this->m_chsOcrPostcode, post_code_vec[j].c_str());
-			strcat(this->m_chsOcrPostcode, ";");
+			
 		}
+		this->m_postcodeNum += post_num;
 	}
 	this->m_PostcodeIndextImage = post_index_image; //最后一个
 
@@ -356,12 +372,19 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 	}
 	end_t = clock();
 	double timeconsume = (double)(end_t - mtime) / CLOCKS_PER_SEC;
-	sprintf_s(loginfo, "算法消耗时间：%.4fs", timeconsume);
+	sprintf_s(loginfo, "Time consume:%.4fs", timeconsume);
 
-	pLogger->TraceInfo(loginfo);
-	std::string logstr = "OCR识别结果为:";
-	logstr = logstr + this->m_chsOcrPostcode;
-	pLogger->TraceInfo(logstr.c_str());
+	if (this->m_postcodeNum != 0) //识别到邮编
+	{
+		pLogger->TraceInfo(loginfo);
+		std::string logstr = "OCR results:";
+		logstr = logstr + this->m_chsOcrPostcode;
+		pLogger->TraceInfo(logstr.c_str());
+	}
+	else
+	{
+		pLogger->TraceInfo("Find no postcode!");
+	}
 
 	return this->m_postcodeNum;
 }
@@ -375,7 +398,7 @@ int ImgprcTask::CopyImageFilesFromServer(const std::string &serverIP, const CStr
 	char loginfo[512] = { 0 };
 	if (img_num != this->m_image_num)
 	{
-		sprintf_s(loginfo, "任务指定的图片数量和路径数量不相符！指定数量为：%d,路径数量为：%d", this->m_image_num, img_num);
+		sprintf_s(loginfo, "Image number from the task is not equal to it from path! task:%d, path:d", this->m_image_num, img_num);
 		pLogger->TraceWarning(loginfo);
 	}
 	int copyed_img_num=0;
@@ -394,14 +417,28 @@ int ImgprcTask::CopyImageFilesFromServer(const std::string &serverIP, const CStr
 			//准备本地图片地址
 			CString localImgDir_tmp;//本地地址
 			localImgDir_tmp.Format(_T("%s"), localImgDir);
-			CString localImgName;
-			DWORD vv = (this->m_dwHImageID * (*(default_random_engine*)pRand)() + this->m_dwLImageID) / 10 % 500;
-			localImgName.Format(_T("%03lu.jpg"), vv);
+			std::string localImgDir_astr = W2A(localImgDir_tmp.GetBuffer(0));
+			if (localImgDir_astr.empty())
+			{
+				localImgDir_astr = "\\";
+			}
+			MakeSureDirectoryPathExists(localImgDir_astr.c_str());
+			//DWORD vv = (this->m_dwHImageID * (*(default_random_engine*)pRand)() + this->m_dwLImageID) / 10 % 500;
+			//localImgName.Format(_T("%03lu.jpg"), vv);
+			//
+			
+			LARGE_INTEGER tima = { 0 };
+			QueryPerformanceCounter(&tima);
+			long long _t = tima.QuadPart;
+			string a = to_string(_t) + ".jpg";
+			CString localImgName = A2T(a.c_str());
 			localImgDir_tmp.Append(localImgName);
+			
 			int re = CopyFile(imgFileName.GetBuffer(0), localImgDir_tmp.GetBuffer(0), FALSE);
 			if (re == FALSE)
 			{
-				pLogger->TraceKeyInfo("从远程拷贝文件失败！");
+				pLogger->TraceWarning("copy file from image server fail!");
+				pLogger->TraceKeyInfo(W2A(imgFileName.GetBuffer(0)));
 			}
 			else
 			{
@@ -426,6 +463,27 @@ int ImgprcTask::CopyImageFilesFromServer(const std::string &serverIP, const CStr
 
 }
 
+int ImgprcTask::DeleteLocalCacheFile(Logger *pLogger)
+{
+	std::vector<std::string> image_pathes;
+	int img_num = splitStrByChar(';', this->m_chsLocalImgPath, image_pathes);
+	for (int i=0;i<img_num;i++)
+	{
+		int res = remove(image_pathes[i].c_str());
+		if (res!=0)
+		{
+			pLogger->TraceWarning("Remove local cache image file Fail!");
+		}
+		else
+		{
+			this->m_chsLocalImgPath[0] = 0;
+		}
+	}
+
+
+	return 1;
+}
+
 int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool isTopView, OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes)
 {
 	cv::Mat srcMat = cv::imread(localimgpath);
@@ -434,11 +492,11 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 		pLogger->TraceWarning("Image file is empty");
 		return 0;
 	}
-	
+	cv::Mat parcelMat;
 	CutParcelBox cutparcel;
 	if (isTopView)//针对顶视图 和侧视图 分别做处理
 	{
-		int isparcel = cutparcel.getMailBox_Mat(srcMat, srcMat, 0);
+		int isparcel = cutparcel.getMailBox_Mat(srcMat, parcelMat);
 		if (isparcel == 0) {
 			pLogger->TraceInfo("Find no parcel in image");
 			return 0;
@@ -446,7 +504,7 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	}
 	else
 	{
-		int isparcel = cutparcel.getMailBox_side(srcMat, srcMat);
+		int isparcel = cutparcel.getMailBox_side(srcMat, parcelMat);
 		if (isparcel == 0) {
 			pLogger->TraceInfo("Find no parcel in image");
 			return 0;
@@ -459,17 +517,24 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	int  res = 0;
 	try
 	{
-		res = hw_digits_ocr.getPostCode2String(srcMat, post_code_str, pOcrConifg);
+		if (pOcrConifg->is_test_model)
+		{
+			res = hw_digits_ocr.getPostCode2String_test(parcelMat, post_code_str, pOcrConifg);
+		}
+		else
+		{
+			res = hw_digits_ocr.getPostCode2String(parcelMat, post_code_str, pOcrConifg);
+		}
+		
 	}
 	catch (...)
 	{
 		pLogger->TraceWarning("handwrite OCR algorithm found exception");
+		pLogger->TraceWarning((std::string("exception file:")+ localimgpath).c_str());
+		//cv::imwrite("saved_file/exception.jpg", parcelMat);
 	}
 	
-	if (res!=0)
-	{
-		detected_postcodes.push_back(post_code_str);
-	}
+
 	if (res==1)
 	{
 		pLogger->TraceInfo("handwrite OCR find only destination postcode");
@@ -480,6 +545,7 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	}
 	else
 	{
+		detected_postcodes.push_back(post_code_str);
 		std::string info_Str = "get hand write postcode:" + post_code_str;
 		pLogger->TraceInfo(info_Str.c_str());
 		return 1;
@@ -492,7 +558,7 @@ BYTE ImgprcTask::GetNextProcessType(OcrAlgorithm_config *pOcrConifg)
 	//按照流程修改
 	if (this->m_processType==ST_TASK_PROC_TAG)
 	{
-		if (pOcrConifg->Run_OCR_on_handwrite_box==1)
+		if (pOcrConifg->Run_OCR_on_handwrite_box == 1)
 		{
 			return ST_TASK_PROC_HWBOX;
 		}
@@ -502,7 +568,7 @@ BYTE ImgprcTask::GetNextProcessType(OcrAlgorithm_config *pOcrConifg)
 	}
 	if (this->m_processType == ST_TASK_PROC_HWBOX)
 	{
-		if (pOcrConifg->Run_OCR_on_unknown_tag==1)
+		if (pOcrConifg->Run_OCR_on_unknown_tag == 1)
 		{
 			return ST_TASK_PROC_UNKNOWN_TAG;
 		}

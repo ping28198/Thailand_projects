@@ -41,7 +41,7 @@ int test_HDR_digits()
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
 	HWDigitsRecog hwdr;
 	//int res = hwdr.initial_avg("E:/python_projects/Digits_recog_cnn/HDRdigits_avg.pb");
-	int res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v8_dper_00961.pb");
+	int res = hwdr.initial("E:/python_projects/Digits_recog_cnn/HDRdigits_v8_dper.pb");
 	if (res == 0)
 	{
 		std::cout << "initial error" << std::endl;

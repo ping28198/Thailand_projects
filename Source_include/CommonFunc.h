@@ -14,8 +14,6 @@ public:
 	CommonFunc();
 
 
-
-
 	//************************************
 	// 函数名:    getAllFilesNameInDir
 	// 描述：    获取文件路径下的所有文件,可指定文件名后缀.不包括：“.”和“..”
@@ -29,8 +27,6 @@ public:
 	static int getAllFilesNameInDir(std::string dir, std::vector<std::string> &filenames,bool isIncludeSubDir=false, bool isReturnPath=false);
 	
 	
-	
-
 	//************************************
 	// 函数:    get_exe_dir		
 	// 全名:  CommonFunc::get_exe_dir		
@@ -39,7 +35,27 @@ public:
 	static std::string get_exe_dir();
 
 
+	//************************************
+	// 函数:    splitDirectoryAndFilename		
+	// 作用： 将路径字符串分割成目录和文件名 #例如："D:/aa/bb.jpg" => "d:/aa/" +"bb.jpg"
+	// 全名:  CommonFunc::splitDirectoryAndFilename		
+	// 返回值:   int		
+	// 参数: std::string src_full_path			#输入的全路径
+	// 参数: std::string & dstDirectory			#输出的目录路径
+	// 参数: std::string & dstFilename			#输出的文件名
+	//************************************
+	static int splitDirectoryAndFilename(std::string src_full_path, std::string &dstDirectory, std::string &dstFilename);
 
+	//************************************
+	// 函数:    joinFilePath		
+	// 作用： 连接两个路径字符串，自动处理斜杠和反斜杠
+	// 全名:  CommonFunc::joinFilePath		
+	// 返回值:   int		#
+	// 参数: std::string path1			#输入路径1
+	// 参数: std::string path2			#输入路径1
+	// 参数: std::string & dstFullPath			#输出全路径
+	//************************************
+	static int joinFilePath(std::string path1, std::string path2, std::string &dstFullPath);
 
-
+	static int getExtensionFilename(std::string srcPath, std::string &dstExName);
 };

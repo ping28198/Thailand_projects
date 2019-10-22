@@ -29,20 +29,15 @@ void CALLBACK TimeFunctionImg(PVOID lpParam, BOOLEAN TimerOrWaitFired);
 
 
 //#define OCR_VIEW_DEBUG
-
-#ifndef OCR_VIEW_DEBUG
-Logger logger("./log", LogLevelMid);
-#else
-Logger logger("./log", LogLevelAll);
-#endif // !1
-
-
+//
+//#ifndef OCR_VIEW_DEBUG
+//Logger logger("./log", LogLevelMid);
+//#else
+//Logger logger("./log", LogLevelAll);
+//#endif // !1
 
 
-
-
-
-
+Logger *plogger=NULL;
 
 
 // CImgprcOCRInstanceView
@@ -60,6 +55,7 @@ END_MESSAGE_MAP()
 
 CRITICAL_SECTION crt_section;
 
+
 // 工作线程用于处理图像
 extern UINT ImageProcessThread(LPVOID pParam)
 {
@@ -67,6 +63,7 @@ extern UINT ImageProcessThread(LPVOID pParam)
 	CImgprcOCRInstanceView *pParent = (CImgprcOCRInstanceView*)pParam;
 	OcrAlgorithm_config mconfig = pParent->m_ocrConifg;
 
+	mconfig.pLogger = plogger;
 
 	TCHAR szFilePath[MAX_PATH + 1] = { 0 };
 	GetModuleFileName(NULL, szFilePath, MAX_PATH);
@@ -79,7 +76,7 @@ extern UINT ImageProcessThread(LPVOID pParam)
 	//mconfig.ORB_template_img2_path = exe_dir + mconfig.ORB_template_img2_path;
 	//mconfig.handwrite_ref_img1_path = exe_dir + mconfig.handwrite_ref_img1_path;//
 
-	//加载tag检测功能
+	//加载tag detector功能
 	tag_detector detecor;
 	std::string model_path = mconfig.detect_model_file_path;
 	float confidence_threshold = mconfig.TagDetectConfidence;
@@ -87,7 +84,7 @@ extern UINT ImageProcessThread(LPVOID pParam)
 	int res = detecor.initial(model_path, confidence_threshold, max_instance_per_class);
 	if (res==0)
 	{
-		logger.TraceError("目标检测初始化失败");
+		plogger->TraceError("Fail to initial tag detection model!");
 	}
 	mconfig.pTagDetector = &detecor;
 
@@ -96,44 +93,36 @@ extern UINT ImageProcessThread(LPVOID pParam)
 	res = mconfig.match_data.getMatchDataFromImg_tagRotate_SIFT(mconfig.ORB_template_img1_path, mconfig.ORB_template_img2_path);
 	if (res == 0)
 	{
-		logger.TraceError("加载匹配数据失败");
+		plogger->TraceError("Fail to load tag match image!");
 	}
 	res = mconfig.match_data.getMatchDataFromImg_handwrite_addr(mconfig.handwrite_ref_img1_path);
 	if (res == 0)
 	{
-		logger.TraceError("加载手写框匹配数据失败");
+		plogger->TraceError("Fail to load handwritten box match image!");
 	}
 
 	//加载ocr功能
 	tesseract::TessBaseAPI mTess;
-	std::string tessDataDir = exe_dir + "tessdata";
-	if (mTess.Init(tessDataDir.c_str(), "eng"))
+	if (mTess.Init(mconfig.tess_data_path.c_str(), "eng"))
 	{
-		logger.TraceError("未加载到OCR引擎文件！");
+		plogger->TraceError("Fail to load OCR engine!");
 		return 0;
-		//MessageBoxW(L"错误，未加载到OCR引擎文件！");
 	}
 	mconfig.pTess = &mTess;
 
 
-	//加载手写数字识别引擎
+	//加载手写数字识别功能
 	HWDigitsRecog hwDigitRec;
 	std::string handwrite_model_path =mconfig.handwrite_ocr_model_path;
 	res = hwDigitRec.initial(handwrite_model_path);
 	if (res == 0)
 	{
-		logger.TraceError("加载手写数字识别模型数据失败");
+		plogger->TraceError("Fail to load handwritten digit recognition model!");
 	}
 	mconfig.pHWDigitsRecog = &hwDigitRec;
 
 	
-
-
-	
-
-
-
-	logger.TraceKeyInfo("线程初始化完毕！");
+	plogger->TraceKeyInfo("Success to start work thread!");
 	//循环检测
 	while (true)
 	{
@@ -163,8 +152,10 @@ CImgprcOCRInstanceView::CImgprcOCRInstanceView()
 
 CImgprcOCRInstanceView::~CImgprcOCRInstanceView()
 {
-
-
+	if (plogger!=NULL)
+	{
+		delete plogger;
+	}
 }
 
 void CImgprcOCRInstanceView::DoDataExchange(CDataExchange* pDX)
@@ -229,6 +220,8 @@ void CImgprcOCRInstanceView::OnInitialUpdate()
 	//		CreateDirectoryW(dir,NULL);
 	//	}
 	//}
+	USES_CONVERSION;
+
 
 	//创建log（即将弃用）
 	TCHAR szFilePath[MAX_PATH + 1] = { 0 };
@@ -238,7 +231,6 @@ void CImgprcOCRInstanceView::OnInitialUpdate()
 	CStringToCharArray(str_url + m_cstrLogDir, chsTemp);
 	sprintf_s(fn,"%sOCR%dLog%04d%02d%02d.txt",chsTemp,m_iLocPort,m_ctime.GetYear(),m_ctime.GetMonth(),m_ctime.GetDay());
 	m_pFileLog=fopen(fn,"a+");
-
 
 
 	unsigned int nchLen;
@@ -253,55 +245,67 @@ void CImgprcOCRInstanceView::OnInitialUpdate()
 	strcpy_s(m_MachineComm.m_chsShortName,"ImageServer");
 	m_MachineComm.ClearMachineBuf();
 
+	//网络设置信息
+	plogger->TraceKeyInfo((std::string("ImageServerIP:") + m_MachineComm.m_chsIPAddress + ":" + to_string(m_MachineComm.m_chsDstPort)).c_str());
+	plogger->TraceKeyInfo((std::string("LocalIP:") + T2A(m_cstrIP.GetBuffer())+":"+to_string(m_iLocPort)).c_str());
+	
 
 	//配置ocrConfig
 	//TCHAR szFilePath[MAX_PATH + 1] = { 0 };
 	GetModuleFileName(NULL, szFilePath, MAX_PATH);
 	(_tcsrchr(szFilePath, _T('\\')))[1] = 0; // 删除文件名，只获得路径字串
 	str_url = szFilePath;  // 例如str_url==e:\program\Debug\  //
-	USES_CONVERSION;
+	
+	//补充全路径
 	std::string exe_dir = T2A(str_url.GetBuffer());
-
 	m_ocrConifg.ORB_template_img1_path = exe_dir + m_ocrConifg.ORB_template_img1_path;
 	m_ocrConifg.ORB_template_img2_path = exe_dir + m_ocrConifg.ORB_template_img2_path;
 	m_ocrConifg.handwrite_ref_img1_path = exe_dir + m_ocrConifg.handwrite_ref_img1_path;//
+	m_ocrConifg.detect_model_file_path = exe_dir + m_ocrConifg.detect_model_file_path;
+	m_ocrConifg.handwrite_ocr_model_path = exe_dir + m_ocrConifg.handwrite_ocr_model_path;
+	m_ocrConifg.tess_data_path = exe_dir + "tessdata";
 
+	//log算法信息
+	plogger->TraceKeyInfo(("Tag detect confidence threshold:" + std::to_string(m_ocrConifg.TagDetectConfidence)).c_str());
+	plogger->TraceKeyInfo(("Max homo class tag in an image:" + std::to_string(m_ocrConifg.max_instance_per_class)).c_str());
+	plogger->TraceKeyInfo(("Handwrite digits confidence threshold:" + std::to_string(m_ocrConifg.HandwriteDigitsConfidence)).c_str());
+	//plogger->TraceKeyInfo(("OCR模型路径：" + tessDataDir).c_str());
+	plogger->TraceKeyInfo(("Tag detect model path:" + m_ocrConifg.detect_model_file_path).c_str());
+	plogger->TraceKeyInfo(("Handwrite digits detect model path:" + m_ocrConifg.handwrite_ocr_model_path).c_str());
+	plogger->TraceKeyInfo(("Handwrite address range reference image path:" + m_ocrConifg.handwrite_ref_img1_path).c_str());
+	plogger->TraceKeyInfo(("Tesseract data path:" + m_ocrConifg.tess_data_path).c_str());
 
-	logger.TraceKeyInfo(("tag detect confidence threshold:" + std::to_string(m_ocrConifg.TagDetectConfidence)).c_str());
-	logger.TraceKeyInfo(("max homo class tag in an image:" + std::to_string(m_ocrConifg.max_instance_per_class)).c_str());
-	//logger.TraceKeyInfo(("OCR模型路径：" + tessDataDir).c_str());
-	logger.TraceKeyInfo(("tag detect model path:" + m_ocrConifg.detect_model_file_path).c_str());
-	logger.TraceKeyInfo(("handwrite digits detect model path:" + m_ocrConifg.handwrite_ocr_model_path).c_str());
-	logger.TraceKeyInfo(("handwrite address range reference image path:" + m_ocrConifg.handwrite_ref_img1_path).c_str());
+	if (m_ocrConifg.is_test_model==1)
+	{
+		plogger->TraceKeyInfo("Run as test mode!");
+	}
 
-
-
-	logger.TraceKeyInfo("starting threading 1...");
+	plogger->TraceKeyInfo("Starting threading 1...");
 	CWinThread *pTheard_process1;
 	pTheard_process1 = AfxBeginThread(ImageProcessThread, this);
 	if (pTheard_process1 == NULL)
 	{
-		logger.TraceError("start threading 1 error");
+		plogger->TraceError("Start threading 1 error");
 		MessageBox(_T("start threading 1 error"));
 	}
 	Sleep(100);
 
-	logger.TraceKeyInfo("starting threading 2...");
+	plogger->TraceKeyInfo("Starting threading 2...");
 	CWinThread *pTheard_process2;
 	pTheard_process2 = AfxBeginThread(ImageProcessThread, this);
 	if (pTheard_process2 == NULL)
 	{
-		logger.TraceError("start threading 2 error");
+		plogger->TraceError("Start threading 2 error");
 		MessageBox(_T("start threading 2 error"));
 	}
 	Sleep(100);
 
-	logger.TraceKeyInfo("starting threading 3...");
+	plogger->TraceKeyInfo("Starting threading 3...");
 	CWinThread *pTheard_process3;
 	pTheard_process3 = AfxBeginThread(ImageProcessThread, this);
 	if (pTheard_process3 == NULL)
 	{
-		logger.TraceError("start threading 3 error");
+		plogger->TraceError("Start threading 3 error");
 		MessageBox(_T("start threading 3 error"));
 	}
 }
@@ -423,7 +427,6 @@ void CImgprcOCRInstanceView::OnTimer(UINT_PTR nIDEvent)
 	m_crlRestTask.SetWindowTextW(cstrNewLine);
 
 
-
 	//接收任务数目
 	m_crlTotal.GetWindowTextW(cstrLine);
 	cstrNewLine.Format(_T("%lu"), m_Sta.m_dwTotal);
@@ -440,8 +443,6 @@ void CImgprcOCRInstanceView::OnTimer(UINT_PTR nIDEvent)
 	{
 		m_crlTagOCROK.SetWindowTextW(cstrNewLine);
 	}
-
-
 
 
 	//取图数量
@@ -510,7 +511,26 @@ afx_msg int CImgprcOCRInstanceView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	//{
 	//	ToDisplay(0,CString(_T("数据库连接成功！")));
 	//}
-
+	EnumLogLevel loglev;
+	switch (m_LogLevel)
+	{
+	case 0:
+		loglev = LogLevelAll;
+		break;
+	case 1:
+		loglev = LogLevelMid;
+		break;
+	case 2:
+		loglev = LogLevelNormal;
+		break;
+	case 3:
+		loglev = LogLevelStop;
+		break;
+	default:
+		loglev = LogLevelAll;
+		break;
+	}
+	plogger = new Logger("./log",loglev);
 
 	//int res = SF_InfoInit(&m_VcsRes);
 
@@ -539,6 +559,7 @@ afx_msg int CImgprcOCRInstanceView::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 	CTime ct =CTime::GetCurrentTime();
 	m_cstrPreDay = 	ct.Format("%Y-%m-%d");
+
 	InitializeCriticalSection(&crt_section);
 
 
@@ -636,12 +657,12 @@ void CALLBACK TimeFunctionImg(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 			proc_type = _T("U");
 		}
 		USES_CONVERSION;
-		info_str.Format(_T("%s"), A2T(mTask.m_chsOcrPostcode));
+		info_str.Format(_T("%s(%d)"), A2T(mTask.m_chsOcrPostcode),mTask.m_postcodeNum);
 		info_str = proc_type + _T(":") + info_str;
 		pView->ToDisplay(1, info_str);
 		int a = pView->DelAnImageProcessTask(mTask);
 		//sprintf((char*)pBuffer, "删除了%d个任务", a);
-		//logger.TraceInfo((char*)pBuffer);
+		//plogger->TraceInfo((char*)pBuffer);
 	}
 	else
 	{
@@ -676,13 +697,13 @@ void CImgprcOCRInstanceView::TCPClientTask(void)
 		{
 			m_MachineComm.AnalyseOneByte(m_MachineComm.m_uchsRawData[i]);
 		}
-		//logger.TraceInfo("收到了一个消息");
+		//plogger->TraceInfo("收到了一个消息");
 		//处理消息
 		BYTE * messageDataBuffer = m_MachineComm.GetOneMessage();
 		if (messageDataBuffer!=NULL)
 		{
 			ProcessOneRMes(messageDataBuffer);
-			//logger.TraceInfo("处理了一个消息");
+			//plogger->TraceInfo("处理了一个消息");
 		}
 		
 	}
@@ -742,13 +763,13 @@ void  CImgprcOCRInstanceView::ProcessOneRMes(BYTE* mbMesPos)
 				memcpy(Task.m_chsBarcode, p + posnow, Task.m_Barcode_len);
 			}
 			
-			SplitTask(Task, subTasks);
+			SplitTask(Task, subTasks); //将具有多个子任务的任务拆分
 			for (i=0;i<subTasks.size();i++)
 			{
 				PushAnImageProcessTask(subTasks[i]);
 			}
 			m_Sta.m_dwTotal++;
-			//logger.TraceInfo("推入了一个任务");
+			//plogger->TraceInfo("推入了一个任务");
 			break;
 		case MPF_MSG_IMG2OCR_FUNC:
 			break;
@@ -816,88 +837,107 @@ int CImgprcOCRInstanceView::ReadINI(void)
 	CString key;
 	app = CString(_T("SETTINGS"));
 
+	//弃用
 	key =CString(_T("ImgDir")); 
 	GetPrivateProfileStringW(app,key,LPCWSTR("0"),wchsTemp,IS_MES_MAX_LEN,cstrIniPath); 
 	m_cstrImgDir= wchsTemp;
-
+	//弃用
 	key =CString(_T("ProcessedDir")); 
 	GetPrivateProfileStringW(app,key,LPCWSTR("D:\\ImageForVideo\\"),wchsTemp,IS_MES_MAX_LEN,cstrIniPath); 
 	m_cstrProcessedDir= wchsTemp;
 
 
+
+	//本地IP地址
 	key =CString(_T("LocIP"));
 	GetPrivateProfileStringW(app,key,LPCWSTR("0"),wchsTemp,IS_MES_MAX_LEN,cstrIniPath); 
 	m_cstrIP= wchsTemp;
 	
+	//本地端口号
 	key  = CString(_T("LocPort"));
 	m_iLocPort = GetPrivateProfileIntW(app,key,10001,cstrIniPath);
 
+	//日志记录级别
+	key = CString(_T("LogLevel"));
+	m_LogLevel = GetPrivateProfileIntW(app, key, 0, cstrIniPath);
 
+	//本机ocrID号
 	key = CString(_T("OCRID"));
 	m_OCRID = GetPrivateProfileIntW(app, key, 1, cstrIniPath);
 
+	//日志目录
 	key =CString(_T("LogPath"));
 	GetPrivateProfileStringW(app,key,LPCWSTR(_T("log\\")),wchsTemp,IS_MES_MAX_LEN,cstrIniPath);
 	m_cstrLogDir = wchsTemp;
 
+	//图像服务器IP地址
 	key =CString(_T("ImageServerIP"));
 	GetPrivateProfileStringW(app,key,LPCWSTR("192.168.1.30"),wchsTemp,IS_MES_MAX_LEN,cstrIniPath); 
 	m_cstrSeverIP= wchsTemp;
 
+	//图像服务器端口号
 	key = CString(_T("ImageServerPort"));
 	m_cstrSeverPort = GetPrivateProfileIntW(app, key, 9999, cstrIniPath);
 
+	//标签检测置信度阈值
 	key = CString(_T("TagDetectConfidence"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0.3"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.TagDetectConfidence = _ttof(wchsTemp);
 
+	//手写数字识别置信度阈值
 	key = CString(_T("HWDigits_confidence"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0.85"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.HandwriteDigitsConfidence = _ttof(wchsTemp);
 
-
+	//是否检测标签
 	key = CString(_T("Run_OCR_on_standard_tag"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("1"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.Run_OCR_on_standard_tag = _ttoi(wchsTemp);
 
+	//是否检测手写框
 	key = CString(_T("Run_OCR_on_handwrite_box"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("1"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.Run_OCR_on_handwrite_box = _ttoi(wchsTemp);
 
+	//每一个图片同类别标签最大数量
 	key = CString(_T("InstanceNumPerClass"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("1"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.max_instance_per_class = _ttoi(wchsTemp);
 
 
+	//标签1匹配样图路径
 	USES_CONVERSION;
 	key = CString(_T("ORB_Template_img1"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.ORB_template_img1_path = CT2A(wchsTemp);
 
+	//标签2匹配样图路径
 	key = CString(_T("ORB_Template_img2"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.ORB_template_img2_path = CT2A(wchsTemp);
 
-
+	//手写框匹配样图路径
 	key = CString(_T("HW_Template_img1"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.handwrite_ref_img1_path = CT2A(wchsTemp);
 
-
+	//标签检测模型路径
 	key = CString(_T("Detect_model_path"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.detect_model_file_path = CT2A(wchsTemp);
 
-
-
-
+	//手写数字识别模型路径
 	key = CString(_T("HWDigits_model_path"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("0"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.handwrite_ocr_model_path = CT2A(wchsTemp);
 
+	//测试模式
+	key = CString(_T("TestMode"));
+	m_ocrConifg.is_test_model = GetPrivateProfileIntW(app, key, 0, cstrIniPath);
 
 
 
+	//以下弃用
 	key  = CString(_T("LastIMAGE"));
 	m_dwLastIMAGE = GetPrivateProfileIntW(app,key,20000,cstrIniPath);
 	
@@ -932,16 +972,15 @@ CString GetLocalFilenameBy(DWORD ll,DWORD hh, int & va)
 {
 	CString cst=_T("");
 
-
 	va=0;
 	DWORD vv = (hh*4294967296+ll)/10%500;
 //	DWORD tt = (hh*4294967296+ll)%10;
 	cst.Format(_T("%03lu.jpg"),vv);
 	va =(int) vv;
-
 	return cst;
-
 }
+
+//处理任务的主函数
 void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 {
 	ImgprcTask mtask;
@@ -952,10 +991,11 @@ void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 		Sleep(50);
 		return;
 	}
+	bool isCacheImageFile = false;
 	//std::string local_img_dir = CT2A(m_cstrImgDir);
 	if (mtask.m_chsLocalImgPath[0]==0)
 	{
-		re = mtask.CopyImageFilesFromServer(m_MachineComm.m_chsIPAddress, m_cstrImgDir, &logger, &e, false);
+		re = mtask.CopyImageFilesFromServer(m_MachineComm.m_chsIPAddress, m_cstrImgDir, plogger, &e, isCacheImageFile);
 	}
 	else
 	{
@@ -963,11 +1003,25 @@ void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 	}
 	if (re != 0)
 	{
-		mtask.PorcessTask(pConfig, &logger);//处理任务的主函数
+		mtask.PorcessTask(pConfig, plogger);//处理任务的主函数
+	}
+	else
+	{
+		//plogger->TraceWarning("Copy image file from Image server Error!");
+		mtask.m_resultState = 11;
+		OnAnImageProcessTaskOver(mtask); //处理完一个任务
+		return;
 	}
 	
 	OnAnImageProcessTaskOver(mtask); //处理完一个任务
-	if (mtask.m_image_total_num == 1) return;
+	if (mtask.m_image_total_num == 1)
+	{
+		if (isCacheImageFile)
+		{
+			mtask.DeleteLocalCacheFile(plogger);
+		}
+		return;
+	}
 
 	//打包子任务
 	std::vector<ImgprcTask> waitPackageTasks;
@@ -976,44 +1030,28 @@ void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 	{
 		MergeHomoTasks(waitPackageTasks, mtask);
 		BYTE next_type = mtask.GetNextProcessType(pConfig);
-		if (next_type!=ST_TASK_PROC_OVER && mtask.m_postcodeNum == 0)
+		//如果流程没有结束，且没有找到邮编，继续下一个流程
+		if (next_type != ST_TASK_PROC_OVER && mtask.m_postcodeNum == 0)
 		{
-			ChangeTasksProcessType(mtask, mtask.m_processType, next_type);
+			ChangeTasksProcessType(mtask, mtask.m_processType, next_type);//更新任务流程
 		}
 		else
 		{
 			DelAnImageProcessTask(mtask);//删除所有待打包任务
+			//mtask.m_processType = ST_TASK_PROC_OVER;
+			mtask.m_isProcessing = ST_TASK_PROCESSED;
 			PushAnImageProcessTask(mtask);//推入打包后的已完成任务
+			if (isCacheImageFile)
+			{
+				for (int i = 0; i < waitPackageTasks.size(); i++)
+				{
+					waitPackageTasks[i].DeleteLocalCacheFile(plogger);
+				}
+			}
+
 		}
 	}
-	////从服务器拷贝图像文件到本地
-	//USES_CONVERSION;
-	//CString imgFileName = A2T(mtask.m_chsFileName);
 
-	////imgFileName.Format(_T("%s"), mtask.m_chsFileName);
-	//int pos = imgFileName.Find(_T(":"));
-	//imgFileName.Delete(0, pos + 2);//删除本地盘符
-	//CString ipAddressServer;
-	//ipAddressServer.Format(_T("\\\\%s\\"), A2T(m_MachineComm.m_chsIPAddress));
-	//imgFileName.Insert(0, ipAddressServer);//加入网络地址
-	//CString localImgDir;//本地地址
-	//localImgDir.Format(_T("%s"), m_cstrImgDir);
-	//CString localImgName;
-	//DWORD vv = (mtask.m_dwHImageID * e() + mtask.m_dwLImageID) / 10 % 500;
-	//localImgName.Format(_T("%03lu.jpg"), vv);
-	//localImgDir.Append(localImgName);
-	//re = CopyFile(imgFileName.GetBuffer(0), localImgDir.GetBuffer(0), FALSE);
-	//if (re==FALSE)
-	//{
-	//	logger.TraceKeyInfo("从远程拷贝文件失败！");
-	//	mtask.m_resultState = 11;
-	//	OnAnImageProcessTaskOver(mtask);
-	//	return;
-	//}
-	////获取图片的本地位置
-	//string imgNamestring = CT2A(localImgDir.GetBuffer(0));
-	//strcpy(mtask.m_chsLocalImgPath, imgNamestring.c_str());
-	
 
 }
 
@@ -1254,7 +1292,7 @@ int CImgprcOCRInstanceView::GenerateMsgData2ImageServer(BYTE *pData, ImgprcTask 
 
 	//char a[64] = { 0 };
 	//sprintf_s(a, "排队等候数量：%d", unProcessNum);
-	//logger.TraceInfo(a);
+	//plogger->TraceInfo(a);
 	return posnow;
 }
 
@@ -1263,8 +1301,9 @@ int CImgprcOCRInstanceView::GenerateMsgData2ImageServer(BYTE *pData, ImgprcTask 
 int CImgprcOCRInstanceView::SplitTask(ImgprcTask &mTask, std::vector<ImgprcTask> &subTasks)
 {
 	
-	if (mTask.m_image_total_num<=0)
+	if (mTask.m_image_total_num <= 0)
 	{
+		plogger->TraceWarning("Received one task, but image quantity is zero!");
 		return 0;
 	}
 	ImgprcTask subTask = mTask;
@@ -1278,6 +1317,7 @@ int CImgprcOCRInstanceView::SplitTask(ImgprcTask &mTask, std::vector<ImgprcTask>
 	ImgprcTask::splitStrByChar(';', mTask.m_chsFileName, substrs);
 	if (substrs.size() < mTask.m_image_total_num)
 	{
+		plogger->TraceWarning("Image path number is less than the number specified!");
 		mTask.m_image_total_num = substrs.size();
 	}
 
@@ -1293,7 +1333,7 @@ int CImgprcOCRInstanceView::SplitTask(ImgprcTask &mTask, std::vector<ImgprcTask>
 			subTask.m_isTopViewImage = false;
 		}
 		subTask.m_index_sub_image = i;
-		subTask.m_image_num = 1;
+		subTask.m_image_num = 1;//子任务的图片数量默认为1
 		subTasks.push_back(subTask);
 	}
 
@@ -1310,6 +1350,10 @@ int CImgprcOCRInstanceView::MergeHomoTasks(std::vector<ImgprcTask> &subTasks, Im
 	{
 		if (subTasks[i].m_postcodeNum>=1)
 		{
+			if (mTask.m_postcodeNum!=0)
+			{
+				strcat(mTask.m_chsOcrPostcode, ";");
+			}
 			mTask.m_PostcodeIndextImage = subTasks[i].m_index_sub_image + 1;
 			strcat(mTask.m_chsOcrPostcode, subTasks[i].m_chsOcrPostcode);
 			//strcat(mTask.m_chsOcrPostcode, ";");
@@ -1418,241 +1462,6 @@ int CImgprcOCRInstanceView::WriteStatoLog(void)
 		return 0;
 	}
 }
-
-
-
-/*
-void CIMGSVRView::Case2ImageProcessing(MAILDATA * pMail)
-{
-
-	CString cstrfliter;
-	CString cstrLine;
-	//	MAILDATA * pMail = NULL;
-	int re = 0,rexml=0;
-	int i;
-	int tt;
-	char chsFormat[]="**&&&&&&&&&**";
-	char chstemp[IS_MES_MAX_LEN];
-	char chstemp2[IS_MES_MAX_LEN];
-	//	char chsItem[IS_IMAGE_MAX_PATH];
-	CString cstrItem;
-	CString cstrNewName,cstrName;
-	CString cstrDir;
-	CString cstrJPG, cstrXML;
-	int pos=-1;
-	int reDB=0;
-
-	//用文件最后修改时刻重新命名图像文件
-	sprintf_s(pMail->m_chsNewFileName, "%04d%02d%02d%02d%02d%02d%03d_%s",
-		pMail->m_stLastWriteTime.wYear,pMail->m_stLastWriteTime.wMonth, pMail->m_stLastWriteTime.wDay,\
-		pMail->m_stLastWriteTime.wHour,pMail->m_stLastWriteTime.wMinute,pMail->m_stLastWriteTime.wSecond,\
-		pMail->m_stLastWriteTime.wMilliseconds, pMail->m_chsImageName);
-
-	if(m_bSaveOBRed)
-	{
-		re = SaveJpgXmltoNewDir(pMail, this->m_cstrOBRedDir);
-		if(re & SAVE_JPG_OK)
-		{
-			m_sta.m_dwOBRedJPG++;
-		}
-		if(re & SAVE_XML_OK )
-		{
-			m_sta.m_dwOBRedXML++;		
-		}
-	}
-
-	if(m_bSaveRej1==1 && pMail->m_bEnable==IADM_ENABLE_OBR) //保存条码阅读器返回拒绝识别的图像和xml
-	{
-		if(pMail->m_dwOBR1BarNum<=0)
-		{
-			tt = GetTickCount();
-			re = 0;
-			re = SaveJpgXmltoNewDir(pMail, this->m_cstrSaveRejPath1);
-			tt = GetTickCount() - tt;
-			if(re & SAVE_JPG_OK )
-			{
-				m_sta.m_dwRej1SaveJPG++;
-			}
-			if(re & SAVE_XML_OK )
-			{
-				m_sta.m_dwRej1SaveXML++;		
-			}
-			cstrLine.Format(_T("REGN:%03d E%x F%d Rej1SaveJPG&XML:%d (%dms) JPGNUM:%d XMLNUM:%d"),\
-				pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,re,tt,m_sta.m_dwRej1SaveJPG,m_sta.m_dwRej1SaveXML);
-			ToDisplay(0,cstrLine);
-		}
-	}
-
-	if(pMail->m_bEnable==IADM_ENABLE_OBR)
-	{
-		//读取XML
-		tt = GetTickCount();
-		re = ReadXMLFile(pMail);
-		tt = GetTickCount() - tt;
-		pMail->m_dwTimeReadXMLFile = tt;
-		if(re==-1)
-		{
-			m_Err.m_dwErrReadXMLFile++;
-		}
-		else 
-		{
-			m_sta.m_dwOpenXmlOK++;
-			if(pMail->m_dwOBR3BarNum>0)
-				m_sta.m_dwOBR3++;
-		}
-		cstrLine.Format(_T("REGN:%03d E%x F%d ReadXML:%d(%dms) BarNUM:%d"), \
-			pMail->m_dwTrayNo, pMail->m_bEnable, pMail->m_bFlag, re, tt, pMail->m_dwOBR3BarNum);
-		ToDisplay(0,cstrLine);
-
-		if(pMail->m_dwOBR3BarNum>0)
-		{
-			m_sta.m_dwOBR1++;
-			for(i=0; i<int(pMail->m_dwOBR3BarNum); i++)
-			{
-				strcpy_s(chstemp, &(pMail->m_chsBar3[i*IS_BAR_MAX_LEN]));
-				strcpy_s(chstemp2, &(pMail->m_chsPos3[i*IS_POS_MAX_LEN]));
-				cstrLine.Format(_T("\t%s [%s] "),CString(chstemp), CString(chstemp2));
-				ToDisplay(0,cstrLine);	
-			}
-		}
-		tt = GetTickCount();
-		//tx bind var
-//		reDB = m_IMGSVRDB.UpdateMailRecordXML(pMail,m_dwImageNo);
-		reDB = m_IMGSVRDB.bvUpdateMailRecordXML(pMail,m_dwImageNo);
-		tt = GetTickCount() - tt;
-
-		if(reDB== IMGSVRDB_RETURN_OK)
-		{
-			m_sta.m_dwUpdateMailRecordXML++;	
-		}
-		else
-		{
-			m_Err.m_dwErrUpdateMailRecordXML++;
-		}
-		cstrLine.Format(_T("REGN:%03d E%x F%d UpdateXMLtoDB:%d(%dms)"),pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,reDB,tt);
-		ToDisplay(0,cstrLine);	
-
-
-		if(pMail->ReaderBarIsInXML())
-			//if(pMail->m_dwOBR1BarNum == pMail->m_dwOBR3BarNum)
-		{
-			m_sta.m_dwReaderSame++;
-			pMail->m_bReaderSame = 1;
-			cstrLine.Format(_T("REGN:%03d E%x F%d Bars_in_RealTime&XML_Same:%d"),\
-				pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,pMail->m_bReaderSame);
-		}
-		else
-		{
-			pMail->m_bReaderSame = 0;
-			cstrLine.Format(_T("REGN:%03d E%x F%d Bars_in_RealTime&XML_Same:%d FN:%s"),\
-				pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,pMail->m_bReaderSame,CString(pMail->m_chsNewFileName));
-		}
-		ToDisplay(0,cstrLine);	
-	}//if(pMail->m_bEnable==IADM_ENABLE_OCR)
-
-	//将图像复制到OVCR需要访问的路径
-	tt = GetTickCount();
-	re = ReadImageFile(pMail->m_chsJPGName, m_uchsImage,pMail->m_dwImgWidth, pMail->m_dwImgHeight);
-	tt = GetTickCount()-tt;
-	pMail->m_dwTimeReadJpgFile = tt;
-	if(re!=1)
-	{
-		if(re ==-1) //图像过大
-		{
-			m_Err.m_dwErrImgOverSize++;
-			cstrLine.Format(_T("REGN:%03d E%x F%d ImageSizeOver8196*8196! Image:%s"),\
-				pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,CString(pMail->m_chsJPGName));
-			ToDisplay(0,cstrLine);
-		}
-		else //其他原因
-		{
-			m_Err.m_dwErrReadImageFile++;
-			cstrLine.Format(_T("REGN:%03d E%x F%d ReadJpgFailed! Image:%s"),\
-				pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,CString(pMail->m_chsJPGName));
-			ToDisplay(0,cstrLine);
-		}
-	}
-	else
-	{
-		cstrLine.Format(_T("REGN:%03d E%x F%d ReadJpgOK! Image:%s"),\
-				pMail->m_dwTrayNo,pMail->m_bEnable,pMail->m_bFlag,CString(pMail->m_chsJPGName));
-		ToDisplay(0,cstrLine);
-	}
-
-	//	cstrNewName.Format(_T("%s%s.jpg"), this->m_cstrBGRemovedDir, CString(pMail->m_chsImageName));
-	cstrName = CString(pMail->m_chsJPGName);
-
-	re=GetJPGNAME(pMail,cstrNewName);
-	if(re==1)
-	{
-		m_sta.m_dwJPGName++;
-	}
-	cstrNewName = this->m_cstrBGRemovedDir+cstrNewName;
-
-	CFileFind ff;
-	CString cstrBGDir;
-	cstrBGDir.Format(_T("%s%03d*.jpg"),m_cstrBGRemovedDir,pMail->m_dwTrayNo);
-	re = ff.FindFile(cstrBGDir);
-	int reDel=0;
-	if(re)
-	{
-		while(re)
-		{
-			re = ff.FindNextFile();
-			reDel= DeleteFileW(ff.GetFilePath());
-			if(reDel!=1)
-			{
-				int Err=GetLastError();
-
-				m_Err.m_dwErrDeleteFile++;
-				cstrLine.Format(_T("%s can delete Error%d"),ff.GetFilePath(),Err);
-				ToDisplay(0,cstrLine);
-			}
-		}
-	}
-	re = 0;
-	re = CopyFile(cstrName,cstrNewName,0);
-	if(re==1)
-	{
-		pMail->m_dwBRImgWidth =  pMail->m_dwImgWidth;
-		pMail->m_dwBRImgHeight = pMail->m_dwImgHeight;
-		pMail->m_dwBRLeft = 0;
-		pMail->m_dwBRTop = 0;
-		pMail->m_dwBRRight = pMail->m_dwBRImgWidth;
-		pMail->m_dwBRBottom = pMail->m_dwBRImgHeight;
-		m_sta.m_dwBROK++;
-		cstrLine.Format(_T("REGN:%03d E%x F%d 图像复制到Z盘成功!"), pMail->m_dwTrayNo, pMail->m_bEnable, pMail->m_bFlag);
-		ToDisplay(0,cstrLine);	
-
-		reDB=0;
-		tt = GetTickCount();
-		//tx bind var
-//		reDB = m_IMGSVRDB.UpdateMailRecordBR(pMail,m_dwImageNo);
-		reDB = m_IMGSVRDB.bvUpdateMailRecordBR(pMail,m_dwImageNo);
-		tt = GetTickCount() - tt;
-
-		if(reDB==IMGSVRDB_RETURN_OK)
-		{
-			m_sta.m_dwUpdateMailRecordBR++;
-		}
-		else
-		{
-			m_Err.m_dwErrUpdateMailRecordBR++;
-		}
-		cstrLine.Format(_T("REGN:%03d E%x F%d UpdateBR:%d(%dms)"),pMail->m_dwTrayNo, pMail->m_bEnable, pMail->m_bFlag,reDB,tt);
-		ToDisplay(0,cstrLine);	
-	}
-	else
-	{
-		m_Err.m_dwErrBR++;
-		cstrLine.Format(_T("REGN:%03d E%x F%d 图像复制到Z盘失败!"), pMail->m_dwTrayNo, pMail->m_bEnable, pMail->m_bFlag);
-		ToDisplay(0,cstrLine);	
-	}
-
-	//tx 20140518
-	SendIMGRESULT(pMail);
-}
-*/
 
 
 

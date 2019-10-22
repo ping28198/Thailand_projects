@@ -165,3 +165,63 @@ int ImageProcessFunc::getContourRect(std::vector<cv::Point2f> & points_vec, cv::
 
 }
 
+int ImageProcessFunc::getContourRect(std::vector<cv::Point> & points_vec, cv::Rect &mRect)
+{
+	cv::Point lf = points_vec[0];
+	cv::Point rt = points_vec[0];
+	cv::Point tp = points_vec[0];
+	cv::Point bt = points_vec[0];
+	for (auto pt : points_vec)
+	{
+		if (pt.x < lf.x) lf = pt;
+		if (pt.x > rt.x) rt = pt;
+		if (pt.y < tp.y) tp = pt;
+		if (pt.y > bt.y) bt = pt;
+	}
+	int w = rt.x - lf.x+1;
+	int h = bt.y - tp.y+1;
+	mRect.x = lf.x;
+	mRect.width = w;
+	mRect.y = tp.y;
+	mRect.height = h;
+
+	return 1;
+}
+
+int ImageProcessFunc::CropRect(cv::Rect main_rect, cv::Rect &to_crop_rect)
+{
+	if ((to_crop_rect.x + to_crop_rect.width) <= main_rect.x)
+	{
+		to_crop_rect = cv::Rect();
+		return 0;
+	}
+	if ((to_crop_rect.y + to_crop_rect.height) <= main_rect.y)
+	{
+		to_crop_rect = cv::Rect();
+		return 0;
+	}
+	if (to_crop_rect.x >= (main_rect.width + main_rect.x))
+	{
+		to_crop_rect = cv::Rect();
+		return 0;
+	}
+	if (to_crop_rect.y >= (main_rect.height + main_rect.y))
+	{
+		to_crop_rect = cv::Rect();
+		return 0;
+	}
+	int tl_x = to_crop_rect.x;
+	int tl_y = to_crop_rect.y;
+	int br_x = to_crop_rect.x + to_crop_rect.width;
+	int br_y = to_crop_rect.y + to_crop_rect.height;
+
+	if (main_rect.x > tl_x) tl_x = main_rect.x;
+	if (main_rect.y > tl_y) tl_y = main_rect.y;
+	if (main_rect.x + main_rect.width < br_x) br_x = main_rect.x + main_rect.width;
+	if (main_rect.y + main_rect.height < br_y) br_y = main_rect.y + main_rect.height;
+
+	cv::Rect tmp(tl_x, tl_y, br_x - tl_x, br_y - tl_y);
+	to_crop_rect = tmp;
+	return 1;
+}
+

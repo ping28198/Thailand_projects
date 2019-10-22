@@ -200,7 +200,7 @@ int MPFCommuication::AnalyseOneByte(unsigned char byteData)
 				{	
 					nMsgLen = m_dwRevCount-1;
 				}//tx 20140529
-				else if(m_uchsRevMesNow[1]==MPF_MSG_IMG2OCR_FUNC)	//madm 设置
+				else if(m_uchsRevMesNow[1] == MPF_MSG_IMG2OCR_FUNC)	//madm 设置
 				{
 					nMsgLen = m_dwRevCount-1;
 				}
@@ -213,7 +213,7 @@ int MPFCommuication::AnalyseOneByte(unsigned char byteData)
 					}
 					check = ~check;
 					check++;
-					if (check == m_uchsRevMesNow[nMsgLen])                 //LRC校验正确
+					if (check == m_uchsRevMesNow[nMsgLen])//LRC校验正确
 					{
 						if( (m_dwRRevP-m_dwRProcP)>=(IADM_REV_BUF_ROW-1))
 						{

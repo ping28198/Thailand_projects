@@ -131,3 +131,90 @@ std::string CommonFunc::get_exe_dir()
 	return exe_dir;
 }
 
+int CommonFunc::splitDirectoryAndFilename(std::string src_full_path, std::string &dstDirectory, std::string &dstFilename)
+{
+
+	size_t pos1 = src_full_path.find_last_of('\\');
+	size_t pos2 = src_full_path.find_last_of('/');
+	size_t pos;
+	if (pos1!=src_full_path.npos && pos2 != src_full_path.npos)
+	{
+		pos = (pos1 < pos2) ? pos2 : pos1;
+		pos++;
+	}
+	else if(pos1!= src_full_path.npos)
+	{
+		pos = pos1;
+		pos++;
+	}
+	else if (pos2 != src_full_path.npos)
+	{
+		pos = pos2;
+		pos++;
+	}
+	else
+	{
+		pos = 0;
+	}
+	dstDirectory = src_full_path.substr(0, pos);
+	dstFilename = src_full_path.substr(pos);
+	return 1;
+}
+
+int CommonFunc::joinFilePath(std::string path1, std::string path2, std::string &dstFullPath)
+{
+	size_t pos1 = path1.find_last_of('\\');
+	size_t pos2 = path1.find_last_of('/');
+	size_t pos3 = path2.find_first_of('\\');
+	size_t pos4 = path2.find_first_of('/');
+	if ((pos1!=(path1.size()-1)) && (pos2 != (path1.size()-1)) && (pos3 != 0) && (pos4 != 0))
+	{
+		path1.append("/");
+	}
+	else if(((pos1 == (path1.size() - 1)) || (pos2 == (path1.size() - 1)))
+		&& ((pos3 == 0) || (pos4 == 0)))
+	{
+		path1.pop_back();
+	}
+	dstFullPath = path1 + path2;
+	return 1;
+}
+
+int CommonFunc::getExtensionFilename(std::string srcPath, std::string &dstExName)
+{
+	size_t pos1 = srcPath.find_last_of('\\');
+	size_t pos2 = srcPath.find_last_of('/');
+	size_t pos;
+	if (pos1 != srcPath.npos && pos2 != srcPath.npos)
+	{
+		pos = (pos1 < pos2) ? pos2 : pos1;
+		pos++;
+	}
+	else if (pos1 != srcPath.npos)
+	{
+		pos = pos1;
+		pos++;
+	}
+	else if (pos2 != srcPath.npos)
+	{
+		pos = pos2;
+		pos++;
+	}
+	else
+	{
+		pos = 0;
+	}
+	string _filename = srcPath.substr(pos);
+	pos = _filename.find_first_of('.');
+	if (pos==_filename.npos)
+	{
+		dstExName = "";
+	}
+	else
+	{
+		dstExName = _filename.substr(pos+1);
+	}
+
+	return 1;
+}
+

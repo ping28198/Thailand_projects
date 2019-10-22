@@ -333,6 +333,7 @@ int MPFCommuication::CodeMsgFromOCR2ImgServer(unsigned int nMsgLen, unsigned cha
 	//	}
 	//}
 	//return bFlag;
+	return 1;
 
 }
 
@@ -498,55 +499,53 @@ void MPFCommuication::ClearMachineBuf(void)
 int LongToBytesBigEndian(DWORD Low, DWORD Hig , BYTE * bytes, int index, int len)
 {
 
-            if (8 < len)
-            {
-                return (-1);
-            }
-			int i=0;
-			if(len<=4)
-			{
-				for(i=0;i<len;i++)
-				{
-					bytes[index + i] = (byte)( (Low >> ((len - 1 - i) * 8)) & 0xFF);
-				}
-			}
-			else
-			{
-			int Length = len-4;
-				for (i=0; i < Length; i++)
-				{
-					bytes[index + i] = (byte)( (Hig >> ((Length - 1 - i) * 8)) & 0xFF);
-				}
-				for(i=0;i<4;i++)
-				{
-					bytes[index+Length+ i] = (byte)( (Low >> ((4- 1 - i) * 8)) & 0xFF);
-				}
-			}
-
-
-            return 0;
+	if (8 < len)
+	{
+		return (-1);
+	}
+	int i = 0;
+	if (len <= 4)
+	{
+		for (i = 0; i < len; i++)
+		{
+			bytes[index + i] = (byte)((Low >> ((len - 1 - i) * 8)) & 0xFF);
+		}
+	}
+	else
+	{
+		int Length = len - 4;
+		for (i = 0; i < Length; i++)
+		{
+			bytes[index + i] = (byte)((Hig >> ((Length - 1 - i) * 8)) & 0xFF);
+		}
+		for (i = 0; i < 4; i++)
+		{
+			bytes[index + Length + i] = (byte)((Low >> ((4 - 1 - i) * 8)) & 0xFF);
+		}
+	}
+	return 0;
 }
 
 int BytesToLongBigEndian(DWORD & nLow,DWORD & nHig, BYTE * bytes, int index, int len)
 {
-            if (8 < len)
-            {
-                nLow=0; nHig=0;
-                return (-1);
-            }
+	if (8 < len)
+	{
+		nLow = 0; nHig = 0;
+		return (-1);
+	}
 
-            nLow = 0;
-			nHig=0;
-			int Length = max(0,len-4);
-			int i=0;
-            for ( i = 0; i < Length; ++i)
-            {
-                nHig = (nHig << 8) | bytes[index + i];
-            }
-			for(;i<len;i++)
-			{
-				nLow = (nLow << 8) | bytes[index + i];
-			}
+	nLow = 0;
+	nHig = 0;
+	int Length = max(0, len - 4);
+	int i = 0;
+	for (i = 0; i < Length; ++i)
+	{
+		nHig = (nHig << 8) | bytes[index + i];
+	}
+	for (; i < len; i++)
+	{
+		nLow = (nLow << 8) | bytes[index + i];
+	}
 
-            return 0;
+	return 0;
 }

@@ -4,10 +4,10 @@
 #include "opencv2/xfeatures2d.hpp"
 #include "HWDigitsRecogDll.h"
 
-//#define ROTATE_IMG_DEBUG
-//#define POSTCODE_ROI_DEBUG
-//#define OCR_DEBUG
-//#define POSTCODE_BOX_DEBUG
+//#define ROTATE_IMG_DEBUG  //用于打印标签旋转调试
+//#define POSTCODE_ROI_DEBUG //用于打印标签邮编定位调试
+//#define OCR_DEBUG //用于ocr识别邮编调试
+//#define POSTCODE_BOX_DEBUG //用于手写邮编识别调试
 
 //用于标签匹配
 class MatchDataStruct
@@ -41,22 +41,26 @@ public:
 	void *pTess;
 	void *pHWDigitsRecog;
 	void *pTagDetector;
+	void *pLogger;
 	double TagDetectConfidence;
 	double HandwriteDigitsConfidence;
 	int max_instance_per_class;
 	int Run_OCR_on_standard_tag; //是否检测标准标签邮编
 	int Run_OCR_on_handwrite_box; //是否检测手写邮编
 	int Run_OCR_on_unknown_tag; //是否检测任意标签
+	int is_test_model; //是否为测试模式，仅为测试验收使用
 	OcrAlgorithm_config()
 	{
 		pTess = NULL;
 		pHWDigitsRecog = NULL;
 		pTagDetector = NULL;
+		pLogger = NULL;
 		HandwriteDigitsConfidence = 0.85;
 		TagDetectConfidence = 0.3;
 		max_instance_per_class = 1;
 		Run_OCR_on_handwrite_box = 1;
 		Run_OCR_on_standard_tag = 1;
+		is_test_model = 0;
 	}
 };
 
@@ -160,6 +164,7 @@ public:
 	HWDigitsOCR();
 	int getPostCode2String(std::string srcImgPath, std::string &postcode, OcrAlgorithm_config* pConfig);
 	
+	int getPostCode2String_test(cv::Mat srcImgPath, std::string &postcode, OcrAlgorithm_config* pConfig);
 	//返回1代表找到了目的地邮编，但是没有寄出地邮编，返回2代表找到了目的地和寄出地邮编，返回0什么也没有
 	int getPostCode2String(cv::Mat srcMat, std::string &postcode, OcrAlgorithm_config* pConfig);
 private:
@@ -184,6 +189,15 @@ private:
 	//查询match列表中 new_match点的个数
 	int query_match_count(std::vector<cv::DMatch> &matches, cv::DMatch & new_match);
 	int query_near_count(std::vector<float> &datas, float down_value, float up_value);
+
+	//test 函数使用
+	int score_for_rect(std::vector<cv::Rect> rcs, int im_width, int im_height, std::vector<float> &rc_scores);
+	//int getHandWriteRange_cluster_nobox()
+	int getPostCodeLine_nobox(cv::Mat srcMat, std::vector<cv::Mat> &toMats, std::vector<cv::Mat> &fromMats);
+	int getHandWriteRange(cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect &dstRect, bool &need_rotate);
+	int split_digits_nobox(cv::Mat &srcMat, std::vector<cv::Mat> &dstDigits);
+	int getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector<std::string> &result_str, std::vector<float> &confidence, OcrAlgorithm_config* pConfig);
+
 };
 
 

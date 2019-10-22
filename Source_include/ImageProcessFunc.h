@@ -51,6 +51,11 @@ public:
 	// 参数: std::vector<cv::Point2f> & points_vec			#
 	// 参数: cv::Rect & mRect			#
 	//************************************
-	int getContourRect(std::vector<cv::Point2f> & points_vec, cv::Rect &mRect);
+	static int getContourRect(std::vector<cv::Point2f> & points_vec, cv::Rect &mRect);
+	static int getContourRect(std::vector<cv::Point> & points_vec, cv::Rect &mRect);
+
+	static int CropRect(cv::Rect main_rect, cv::Rect &to_crop_rect);
+
+
 
 };
