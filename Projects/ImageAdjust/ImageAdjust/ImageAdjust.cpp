@@ -14,6 +14,7 @@
 #include <opencv2/ml.hpp>
 #include "wavelet2dcpp.h"
 #include "CutParcelBox.h"
+#include "ImageProcessFunc.h"
 #include <random>
 
 //#include "CutParcelBoxDll.h"
@@ -45,7 +46,7 @@ int Sift(string str2, cv::Mat &dstMat1, cv::Mat &dstMat2);
 int getParcelBox(cv::Mat srcmat, cv::Mat &dstmat, int isTopView);
 int query_match_count(std::vector<DMatch> &matches, DMatch & new_match); 
 int HWdigitsOCR_for_test();
-
+int testGetTray();
 default_random_engine e;
 
 int main()
@@ -63,7 +64,7 @@ int main()
 	//cout << a1 << endl;
 	//CString s;
 	
-
+	//testGetTray();
 	HWdigitsOCR_for_test();
 
 
@@ -1228,9 +1229,9 @@ int HWdigitsOCR_for_test()
 	clock_t start_t, end_t;
 	double alltime = 0;
 	int ncount = 0;
-	string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\王港图像6.28\\顶\\*.jpg";
-	//string dir = "F:\\泰国ocr\\*.jpg";
-	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
+	//string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\王港图像6.28\\顶\\*.jpg";
+	string dir = "F:\\泰国ocr\\OBR1\\*.jpg";
+	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
 
 	tesseract::TessBaseAPI tess;
 	if (tess.Init("./tessdata", "eng"))
@@ -1254,13 +1255,31 @@ int HWdigitsOCR_for_test()
 	int ocr_ok_count = 0;
 	for (i=0;i<imgfiles.size();i++)
 	{
+		//if (i<112) continue;
 		cout << "图片：" << i<<endl;
-		//if (i<9) continue;
-
+		
+		
 		cv::Mat srcm,cutm;
 		srcm = imread(imgfiles[i]);
+		cv::Mat traymat;
+		boxocr.getTrayMat(srcm, traymat);
 		CutParcelBox cutb;
-		cutb.getMailBox_Mat(srcm, cutm);
+		cutb.getMailBox_Mat(traymat, cutm);
+		//string xmlfile = imgfiles[i];
+		//size_t pp = xmlfile.find_last_of('.');
+		//if (pp!=xmlfile.npos)
+		//{
+		//	xmlfile = xmlfile.substr(0, pp);
+		//	xmlfile = xmlfile + ".xml";
+		//	cv::RotatedRect r;
+		//	OcrAlgorithm::getParcelBoxFromSick(xmlfile, r);
+		//	cv::Mat sickm;
+		//	ImageProcessFunc::getMatFromRotatedRect(srcm, sickm, r);
+		//	resize(sickm, sickm, cv::Size(), 0.2, 0.2);
+		//	imshow("sick", sickm);
+		//}
+
+
 		Mat sowm;
 		if (cutm.empty())
 		{
@@ -1269,6 +1288,10 @@ int HWdigitsOCR_for_test()
 		}
 		resize(cutm, sowm, cv::Size(), 0.2, 0.2);
 		imshow("cutm",sowm);
+		//resize(traymat, sowm, cv::Size(), 0.2, 0.2);
+		//imshow("traym", sowm);
+		//resize(srcm, sowm, cv::Size(), 0.2, 0.2);
+		//imshow("srcm", sowm);
 		string ocrstr;
 		int res=0;
 		try
@@ -1286,10 +1309,42 @@ int HWdigitsOCR_for_test()
 			cout << "邮编" << ocrstr << endl;
 			waitKey(0);
 		}
-		//waitKey(0);
+		else
+		{
+			waitKey(0);
+		}
 	}
 
 	cout << "识别率:" << ocr_ok_count/float(i) << endl;
 
 	return 1;
+}
+
+int testGetTray()
+{
+
+	vector<string> imgfiles;
+	string dir = "F:\\泰国ocr\\OBR1\\*.jpg";
+	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
+	HWDigitsOCR hd;
+	cout << imgfiles.size() << endl;
+	for (int i=0;i<imgfiles.size();i++)
+	{
+		//if (i<112) continue;
+
+		cout << i << endl;
+		Mat m = imread(imgfiles[i]);
+		Mat dm;
+		hd.getTrayMat(m, dm);
+		resize(dm, dm, cv::Size(), 0.2, 0.2);
+		imshow("dm", dm);
+
+		waitKey(0);
+	}
+
+
+
+
+	return 1;
+
 }

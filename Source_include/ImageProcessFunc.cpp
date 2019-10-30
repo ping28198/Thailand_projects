@@ -225,3 +225,55 @@ int ImageProcessFunc::CropRect(cv::Rect main_rect, cv::Rect &to_crop_rect)
 	return 1;
 }
 
+bool ImageProcessFunc::IsPointInRect(cv::Point pt, cv::Rect rc)
+{
+	if (pt.x <= (rc.x+rc.width) && pt.x >= rc.x)
+	{
+		if (pt.y <= (rc.y + rc.height) && pt.y >= rc.y)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc)
+{
+	
+	cv::Rect boxRec = rRc.boundingRect();
+	//cv::Rect boxRec_n(0, 0, boxRec.width, boxRec.height);
+
+	cv::Mat padMat = cv::Mat::zeros(boxRec.size(), src_mat.type());
+	cv::Rect cropRect = boxRec;
+	int res = CropRect(cv::Rect(0, 0, src_mat.cols, src_mat.rows), cropRect);
+	if (!res) return 0;
+	cv::Mat boxMat = src_mat(cropRect);
+	cv::Rect copyRect(cropRect.x - boxRec.x, cropRect.y - boxRec.y, cropRect.width, cropRect.height);
+	boxMat.copyTo(padMat(copyRect));
+	int max_lenth = std::max(padMat.cols, padMat.rows);
+
+	cv::Mat padMat_e = cv::Mat::zeros(cv::Size(max_lenth, max_lenth), src_mat.type());
+	cv::Rect rec_e;
+	rec_e.x = (padMat.cols > padMat.rows) ? 0 : (padMat.rows - padMat.cols) / 2;
+	rec_e.y = (padMat.cols > padMat.rows) ? (padMat.cols - padMat.rows) / 2 : 0;
+	rec_e.width = padMat.cols;
+	rec_e.height = padMat.rows;
+
+	padMat.copyTo(padMat_e(rec_e));
+
+	cv::Mat affine_matrix = cv::getRotationMatrix2D(cv::Point2f(padMat_e.cols / 2.0f, padMat_e.rows / 2.0f), rRc.angle, 1.0);//求得旋转矩阵    
+	cv::warpAffine(padMat_e, padMat_e, affine_matrix, padMat_e.size());     //计算图像旋转之后包含图像的最大的矩形    
+
+	cv::Rect cropRec;
+	cropRec.x = padMat_e.cols / 2 - rRc.size.width / 2;
+	cropRec.y = padMat_e.rows / 2 - rRc.size.height / 2;
+	cropRec.width = rRc.size.width;
+	cropRec.height = rRc.size.height;
+	CropRect(cv::Rect(0, 0, padMat_e.cols, padMat_e.rows), cropRec);
+
+	padMat_e(cropRec).copyTo(dst_mat);
+
+	return 1;
+	
+}
+

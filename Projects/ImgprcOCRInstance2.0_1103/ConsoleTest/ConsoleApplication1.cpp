@@ -167,7 +167,8 @@ int server()
 	vector<string> imgpathvec_top;
 	vector<string> imgpathvec_side;
 	string imgdir_side = "F:/shared_data_original/side/*.jpg";
-	string imgdir_top = "F:/shared_data_original/top/*.jpg";
+	//string imgdir_top = "F:/shared_data_original/top/*.jpg";
+	string imgdir_top = "F:/shared_data_original/top/20191021/*.jpg";
 	//string imgdir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_obj_datasets_2/*.jpg";
 	CommonFunc::getAllFilesNameInDir(imgdir_side, imgpathvec_side, true, true);
 	CommonFunc::getAllFilesNameInDir(imgdir_top, imgpathvec_top, true, true);
@@ -237,7 +238,7 @@ int server()
 			//it++;
 			vector<string> img_sends;
 			uniform_int_distribution<unsigned> u(1, 3);
-			int randNum = u(e);
+			int randNum = 3; // u(e);
 			int i = 0;
 			switch (randNum)
 			{
@@ -250,9 +251,9 @@ int server()
 				img_sends.push_back(*(it_side++));
 				break;
 			case 3: //5幅图
-				for (i=0;i<5;i++)
+				for (i=0;i<2;i++) //5幅图
 				{
-					if (i==0)
+					if (true)
 					{
 						if (it_top == imgpathvec_top.end()) it_top = imgpathvec_top.begin();
 						img_sends.push_back(*(it_top++));

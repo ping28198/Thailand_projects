@@ -57,5 +57,13 @@ public:
 	//************************************
 	static int joinFilePath(std::string path1, std::string path2, std::string &dstFullPath);
 
+	//************************************
+	// 函数:    getExtensionFilename		
+	// 作用：获取文件的扩展名
+	// 全名:  CommonFunc::getExtensionFilename		
+	// 返回值:   int		#
+	// 参数: std::string srcPath			#
+	// 参数: std::string & dstExName			#
+	//************************************
 	static int getExtensionFilename(std::string srcPath, std::string &dstExName);
 };

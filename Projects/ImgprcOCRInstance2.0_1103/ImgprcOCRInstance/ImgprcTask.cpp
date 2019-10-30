@@ -486,6 +486,7 @@ int ImgprcTask::DeleteLocalCacheFile(Logger *pLogger)
 
 int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool isTopView, OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes)
 {
+	HWDigitsOCR hw_digits_ocr;
 	cv::Mat srcMat = cv::imread(localimgpath);
 	if (srcMat.empty())
 	{
@@ -496,7 +497,17 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	CutParcelBox cutparcel;
 	if (isTopView)//针对顶视图 和侧视图 分别做处理
 	{
-		int isparcel = cutparcel.getMailBox_Mat(srcMat, parcelMat);
+		int isparcel = 0;
+		try
+		{
+			hw_digits_ocr.getTrayMat(srcMat, parcelMat);
+			isparcel = cutparcel.getMailBox_Mat(parcelMat, parcelMat);
+		}
+		catch (...)
+		{
+			pLogger->TraceWarning("Find Parcel Box exception!");
+		}
+
 		if (isparcel == 0) {
 			pLogger->TraceInfo("Find no parcel in image");
 			return 0;
@@ -511,7 +522,7 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 		}
 	}
 	
-	HWDigitsOCR hw_digits_ocr;
+	
 	std::string post_code_str;
 	
 	int  res = 0;

@@ -197,7 +197,8 @@ private:
 	int getHandWriteRange(cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect &dstRect, bool &need_rotate);
 	int split_digits_nobox(cv::Mat &srcMat, std::vector<cv::Mat> &dstDigits);
 	int getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector<std::string> &result_str, std::vector<float> &confidence, OcrAlgorithm_config* pConfig);
-
+public:
+	int getTrayMat(cv::Mat &srcMat, cv::Mat &dstMat);
 };
 
 

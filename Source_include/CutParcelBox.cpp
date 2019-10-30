@@ -361,6 +361,7 @@ int CutParcelBox::getMatFromRotateRect(const cv::Mat &src_mat, cv::Mat &dst_mat,
 	//cv::Rect boxRec_n(0, 0, boxRec.width, boxRec.height);
 	
 	cv::Mat padMat = cv::Mat::zeros(boxRec.size(),src_mat.type());
+	padMat = ~padMat;
 	cv::Rect cropRect = boxRec;
 	int res = CutParcelBox::CropRect(cv::Rect(0, 0, src_mat.cols, src_mat.rows), cropRect);
 	if (!res) return 0;
@@ -370,6 +371,7 @@ int CutParcelBox::getMatFromRotateRect(const cv::Mat &src_mat, cv::Mat &dst_mat,
 	int max_lenth = std::max(padMat.cols, padMat.rows);
 	
 	cv::Mat padMat_e = cv::Mat::zeros(cv::Size(max_lenth, max_lenth), src_mat.type());
+	padMat_e = ~padMat_e;
 	cv::Rect rec_e;
 	rec_e.x = (padMat.cols > padMat.rows) ? 0 : (padMat.rows - padMat.cols) / 2;
 	rec_e.y = (padMat.cols > padMat.rows) ? (padMat.cols - padMat.rows) / 2 : 0;
@@ -389,8 +391,6 @@ int CutParcelBox::getMatFromRotateRect(const cv::Mat &src_mat, cv::Mat &dst_mat,
 	CutParcelBox::CropRect(cv::Rect(0, 0, padMat_e.cols, padMat_e.rows), cropRec);
 
 	dst_mat = padMat_e(cropRec);
-
-
 
 	return 1;
 }

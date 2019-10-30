@@ -56,6 +56,7 @@ public:
 
 	static int CropRect(cv::Rect main_rect, cv::Rect &to_crop_rect);
 
+	static bool IsPointInRect(cv::Point pt, cv::Rect rc);
 
-
+	static int getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc);
 };

@@ -4964,7 +4964,9 @@ int HWDigitsOCR::getPostCodeLine_nobox(cv::Mat srcMat, std::vector<cv::Mat> &toM
 	bnmat = bnmat(rc_lr_cut);
 
 
-
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("cutmargin", bnmat);
+#endif // POSTCODE_BOX_DEBUG
 	////imshow("cut_tb", bnmat);
 
 	//获得轮廓的rect
@@ -4985,7 +4987,7 @@ int HWDigitsOCR::getPostCodeLine_nobox(cv::Mat srcMat, std::vector<cv::Mat> &toM
 		Rect _rc;
 		ImageProcessFunc::getContourRect(contours[i], _rc);
 		double maera = cv::contourArea(contours[i]);
-		if (_rc.width*_rc.height*0.5 > maera)//轮廓面积只有rect面积的1/2，弃掉
+		if (_rc.width*_rc.height * 0.3 > maera)//轮廓面积只有rect面积的1/2，弃掉
 		{
 			continue;
 		}
@@ -5032,13 +5034,15 @@ int HWDigitsOCR::getPostCodeLine_nobox(cv::Mat srcMat, std::vector<cv::Mat> &toM
 	rc_lr_cut.y /= scal_max2;
 	rc_lr_cut.height /= scal_max2;
 	rc_lr_cut.width /= scal_max2;
+	
 
 	rc_tb_cut.x /= scal_max2;
 	rc_tb_cut.y /= scal_max2;
 	rc_tb_cut.width /= scal_max2;
 	rc_tb_cut.height /= scal_max2;
-
-
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, srcMat.cols, srcMat.rows), rc_tb_cut);
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, srcMat(rc_tb_cut).cols, srcMat(rc_tb_cut).rows), rc_lr_cut);
+	
 	//获取候选的框
 	vector<cv::Mat> fromMatVec;
 	vector<cv::Mat> toMatVec;
@@ -5235,14 +5239,14 @@ int HWDigitsOCR::getHandWriteRange(cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect 
 	dstRect = best_rect1_refine;
 
 	//检查是否旋转
-	int top2rect1 = best_rect1_refine.y + best_rect1_refine.height / 2;
-	int left2rect1 = best_rect1_refine.x + best_rect1_refine.width / 2;
-	int bottom2rect1 = srcMat.rows - top2rect1;
-	int right2rect1 = srcMat.cols - left2rect1;
+	int top2rect1 = best_rect1_refine.y;
+	int left2rect1 = best_rect1_refine.x;
+	int bottom2rect1 = srcMat.rows - (top2rect1+ best_rect1_refine.height);
+	int right2rect1 = srcMat.cols - (left2rect1+best_rect1_refine.width);
 
 	if (top2rect1<bottom2rect1)
 	{
-		if (top2rect1 < srcMat.rows / 4 && left2rect1 < srcMat.cols / 4)
+		if (left2rect1 < srcMat.cols / 8)
 		{
 			need_rotate = true;
 		}
@@ -5253,7 +5257,7 @@ int HWDigitsOCR::getHandWriteRange(cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect 
 	}
 	else
 	{
-		if (bottom2rect1 > srcMat.rows / 4 && right2rect1 > srcMat.cols / 4)
+		if (right2rect1 > srcMat.cols / 8)
 		{
 			need_rotate = true;
 		}
@@ -5469,8 +5473,8 @@ int HWDigitsOCR::getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector
 		float m_configence = 1;
 		for (int j = 0; j < 5; j++)
 		{
-			res_str.append(std::to_string(class_vec[i+j]));
-			m_configence *= configdenc_vec[i+j];
+			res_str.append(std::to_string(class_vec[i*5+j]));
+			m_configence *= configdenc_vec[i*5+j];
 		}
 		result_str.push_back(res_str);
 		confidence.push_back(m_configence);
@@ -5479,4 +5483,64 @@ int HWDigitsOCR::getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector
 
 	return postcodeline_num;
 
+}
+
+int HWDigitsOCR::getTrayMat(cv::Mat &srcMat, cv::Mat &dstMat)
+{
+	Mat sm = srcMat.clone();
+	double scal_ = 1000.0f / max(sm.cols, sm.rows);
+	resize(sm, sm, cv::Size(), scal_, scal_);
+	if (sm.channels()==3)
+	{
+		cvtColor(sm, sm, COLOR_BGR2GRAY);
+	}
+	//imshow("sm", sm);
+	int mht = sm.rows;
+	int mwd = sm.cols;
+	float avgpix = ImageProcessFunc::getAverageBrightness(sm);
+	cv::threshold(sm, sm,avgpix + (255-avgpix)*0.5, 255, THRESH_BINARY);
+	Mat melement = getStructuringElement(cv::MORPH_RECT, cv::Size(50,2));
+	morphologyEx(sm, sm, cv::MORPH_CLOSE, melement);
+
+	//imshow("bm", sm);
+	Rect topsampleR(mwd/5-1,0,mwd*3/5,mht/4);
+	Rect bottomsampleR(mwd / 5-1, mht*3/4-1, mwd * 3 / 5, mht / 4);
+	//imshow("tpm", sm(topsampleR));
+	//imshow("btm", sm(bottomsampleR));
+	vector<unsigned int> tysum,bysum;
+	ImageProcessFunc::sumPixels(sm(topsampleR), 0, tysum);
+	ImageProcessFunc::sumPixels(sm(bottomsampleR), 0, bysum);
+
+	int start_p = 0;
+	int end_p = mht-1;
+	for (int i=0;i<tysum.size();i++)
+	{
+		
+		int avgp = tysum[i] / topsampleR.width;
+		if (avgp>=150)
+		{
+			start_p += (i + 15);
+			break;
+		}
+	}
+	cout << endl;
+	for (int i = bysum.size()-1; i >=0 ; i--)
+	{
+		int avgp = bysum[i] / bottomsampleR.width;
+		//cout << avgp << " ";
+		if (avgp >= 150)
+		{
+			
+			end_p -= (bysum.size() - i + 15);
+			break;
+		}
+	}
+	cv::Rect cropr(0, start_p, sm.cols, end_p - start_p);
+	cropr.y /= scal_;
+	cropr.height /= scal_;
+	cropr.width /= scal_;
+	ImageProcessFunc::CropRect(cv::Rect(0,0,srcMat.cols,srcMat.rows), cropr);
+
+	dstMat = srcMat(cropr).clone();
+	return 1;
 }
