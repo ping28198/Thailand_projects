@@ -76,3 +76,11 @@ void CImgprcOCRInstanceDoc::Dump(CDumpContext& dc) const
 
 
 // CImgprcOCRInstanceDoc 命令
+
+
+void CImgprcOCRInstanceDoc::SetTitle(LPCTSTR lpszTitle)
+{
+	// TODO: 在此添加专用代码和/或调用基类
+
+	CDocument::SetTitle(_T("OCR"));
+}

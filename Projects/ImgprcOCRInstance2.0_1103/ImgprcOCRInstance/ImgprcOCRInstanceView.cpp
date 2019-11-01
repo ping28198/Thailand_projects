@@ -899,6 +899,11 @@ int CImgprcOCRInstanceView::ReadINI(void)
 	GetPrivateProfileStringW(app, key, LPCWSTR("1"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
 	m_ocrConifg.Run_OCR_on_handwrite_box = _ttoi(wchsTemp);
 
+	//是否检测任意标签
+	key = CString(_T("Run_OCR_on_arbitrary_tag"));
+	GetPrivateProfileStringW(app, key, LPCWSTR("1"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);
+	m_ocrConifg.Run_OCR_on_handwrite_box = _ttoi(wchsTemp);
+
 	//每一个图片同类别标签最大数量
 	key = CString(_T("InstanceNumPerClass"));
 	GetPrivateProfileStringW(app, key, LPCWSTR("1"), wchsTemp, IS_MES_MAX_LEN, cstrIniPath);

@@ -15,6 +15,7 @@
 #include "tag_detect.h"
 #define MAIL_MAX_NUM 500
 #define DATABASE_NAME_LEN 100
+
 class CImgprcOCRInstanceView : public CFormView
 {
 protected: // 仅从序列化创建

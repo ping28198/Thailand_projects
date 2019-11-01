@@ -8,7 +8,7 @@
 //#define POSTCODE_ROI_DEBUG //用于打印标签邮编定位调试
 //#define OCR_DEBUG //用于ocr识别邮编调试
 //#define POSTCODE_BOX_DEBUG //用于手写邮编识别调试
-
+//#define ARBIT_TAG_DEBUG
 //用于标签匹配
 class MatchDataStruct
 {
@@ -60,6 +60,7 @@ public:
 		max_instance_per_class = 1;
 		Run_OCR_on_handwrite_box = 1;
 		Run_OCR_on_standard_tag = 1;
+		Run_OCR_on_unknown_tag = 1;
 		is_test_model = 0;
 	}
 };
@@ -121,6 +122,7 @@ private:
 	int getLargestContourAccordKernelSize(cv::Mat srcimg,
 		std::vector<cv::Point> &largest_contour, cv::Size ksize);
 	double iou_y(cv::Rect r1, cv::Rect r2); //y方向的iou
+public:
 	bool isStanderPostcode(std::string srcstr, std::string &postcodestr);
 	//double postcodeStringScore(std::string srcStr, std::string &resultStr);//ocr得到的字符串是否为邮编打分。
 	int matchImage(cv::Mat srcImg,cv::Mat targetImg, std::vector<cv::Rect> rRects);//模板匹配
@@ -202,3 +204,13 @@ public:
 };
 
 
+class ArbitTagOCR
+{
+public:
+	ArbitTagOCR() {};
+	int getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat);
+	int getPostCodeString(cv::Mat srcMat, std::string &postcode, OcrAlgorithm_config* pConfig);
+	std::string runOCR(cv::Mat &srcMat, OcrAlgorithm_config* pConfig);
+
+
+};

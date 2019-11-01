@@ -1230,8 +1230,8 @@ int HWdigitsOCR_for_test()
 	double alltime = 0;
 	int ncount = 0;
 	//string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\王港图像6.28\\顶\\*.jpg";
-	string dir = "F:\\泰国ocr\\OBR1\\*.jpg";
-	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
+	string dir = "F:\\泰国ocr\\pic2\\*.jpg";
+	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
 
 	tesseract::TessBaseAPI tess;
 	if (tess.Init("./tessdata", "eng"))
@@ -1292,17 +1292,21 @@ int HWdigitsOCR_for_test()
 		//imshow("traym", sowm);
 		//resize(srcm, sowm, cv::Size(), 0.2, 0.2);
 		//imshow("srcm", sowm);
+		ArbitTagOCR artag;
 		string ocrstr;
 		int res=0;
+		Mat tagMat;
 		try
 		{
-			res = boxocr.getPostCode2String_test(cutm, ocrstr, &ocrCfg);
+			
+			res = artag.getPostCodeString(cutm, ocrstr, &ocrCfg);
+			//res = boxocr.getPostCode2String_test(cutm, ocrstr, &ocrCfg);
 		}
 		catch (...)
 		{
-			cout << "exception" << endl;
+			cout << "hand write recog exception" << endl;
 		}
-
+		//imshow("tag", tagMat);
 		if (res!=0)
 		{
 			ocr_ok_count++;

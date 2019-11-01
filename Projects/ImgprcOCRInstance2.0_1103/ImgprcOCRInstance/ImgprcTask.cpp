@@ -166,14 +166,20 @@ int ImgprcTask::GetPostcode(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 */
 int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string>&detected_postcodes)
-{
+ {
+	//日志头信息
+	string taskid;
+	taskid.append((char*)(this->m_TaskID), 6);
+	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]Standard tag:";
+
+
 	clock_t end_t, mtime;
 	char logprint[128];
 	//pLogger->TraceInfo("处理一个新的任务！");
 	//std::string localimgpath = std::string(this->m_chsLocalImgPath);
 	if (localimgpath.empty())
 	{
-		pLogger->TraceWarning("Image path is empty!");
+		pLogger->TraceWarning((informor + "Image path is empty!").c_str());
 		this->m_postcodeNum = 0;
 		return 0;
 	}
@@ -182,7 +188,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	cv::Mat src_img = cv::imread(localimgpath);
 	if (src_img.empty())
 	{
-		string _logstr = "Image is empty! Imagepath:" + localimgpath;
+		string _logstr = informor + "Image is empty! Imagepath:" + localimgpath;
 		pLogger->TraceWarning(_logstr.c_str());
 		this->m_postcodeNum = 0;
 		return 0;
@@ -193,7 +199,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	{
 		int isparcel = cutparcel.getMailBox_Mat(src_img, src_img,0);
 		if (isparcel == 0) {
-			pLogger->TraceInfo("No parcel");
+			pLogger->TraceInfo((informor+"No parcel").c_str());
 			return 0;
 		}
 	}
@@ -201,7 +207,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	{
 		int isparcel = cutparcel.getMailBox_side(src_img, src_img);
 		if (isparcel == 0) {
-			pLogger->TraceInfo("No parcel");
+			pLogger->TraceInfo((informor + "No parcel").c_str());
 			return 0;
 		}
 	}
@@ -258,7 +264,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 		}
 		catch (...)
 		{
-			pLogger->TraceWarning("OCR algorithm exception!");
+			pLogger->TraceWarning((informor+"OCR algorithm exception!").c_str());
 			continue;
 		}
 
@@ -269,13 +275,13 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 
 			if (post_str.empty() && res !=0)
 			{
-				pLogger->TraceWarning("Postcode is empty but should not!");
+				pLogger->TraceWarning((informor + "Postcode is empty but should not!").c_str());
 				sprintf_s(mstr, "ng_%d.jpg", mid);
 				save_ng_file.append(mstr);
 				imwrite(save_ng_file, tag_roi);
 				continue;
 			}
-			pLogger->TraceInfo("OCR result is empty");
+			pLogger->TraceInfo((informor + "OCR result is empty").c_str());
 			//this->m_postcodeNum = 0;
 			sprintf_s(mstr, "%d.jpg", mid);
 			save_ng_file.append(mstr);
@@ -311,6 +317,25 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 
 int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 {
+	//日志设置
+	string taskid;
+	taskid.append((char*)(this->m_TaskID), 6);
+	string process_type;
+	if (this->m_processType == 0)
+	{
+		process_type = "Standard tag";
+	}
+	else if (this->m_processType == 1)
+	{
+		process_type = "Handwrite box";
+	}
+	else if (this->m_processType == 2)
+	{
+		process_type = "Arbitrary tag";
+	}
+	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]"+ process_type+":";
+
+
 	//获取图片路径
 	std::vector<std::string> image_pathes;
 	int img_num = splitStrByChar(';', this->m_chsLocalImgPath, image_pathes);
@@ -340,6 +365,9 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 			break;
 		case ST_TASK_PROC_HWBOX:
 			post_num = GetPostcodeFromHandwrite(image_pathes[i], isTopView, pOcrConifg, pLogger, post_code_vec);
+			break;
+		case ST_TASK_PROC_UNKNOWN_TAG:
+			post_num = GetPostcodeFromArbitTag(image_pathes[i], isTopView, pOcrConifg, pLogger, post_code_vec);
 			break;
 		default:
 			break;
@@ -376,14 +404,14 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 
 	if (this->m_postcodeNum != 0) //识别到邮编
 	{
-		pLogger->TraceInfo(loginfo);
-		std::string logstr = "OCR results:";
+		pLogger->TraceInfo((informor + loginfo).c_str());
+		std::string logstr = informor + "OCR results:";
 		logstr = logstr + this->m_chsOcrPostcode;
 		pLogger->TraceInfo(logstr.c_str());
 	}
 	else
 	{
-		pLogger->TraceInfo("Find no postcode!");
+		pLogger->TraceInfo((informor + "Find no postcode!").c_str());
 	}
 
 	return this->m_postcodeNum;
@@ -486,11 +514,14 @@ int ImgprcTask::DeleteLocalCacheFile(Logger *pLogger)
 
 int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool isTopView, OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes)
 {
+	string taskid;
+	taskid.append((char*)(this->m_TaskID), 6);
+	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]Handwrite box:";
 	HWDigitsOCR hw_digits_ocr;
 	cv::Mat srcMat = cv::imread(localimgpath);
 	if (srcMat.empty())
 	{
-		pLogger->TraceWarning("Image file is empty");
+		pLogger->TraceWarning((informor+"Image file is empty").c_str());
 		return 0;
 	}
 	cv::Mat parcelMat;
@@ -505,11 +536,11 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 		}
 		catch (...)
 		{
-			pLogger->TraceWarning("Find Parcel Box exception!");
+			pLogger->TraceWarning((informor + "Find Parcel Box exception!").c_str());
 		}
 
 		if (isparcel == 0) {
-			pLogger->TraceInfo("Find no parcel in image");
+			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
 			return 0;
 		}
 	}
@@ -517,7 +548,7 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	{
 		int isparcel = cutparcel.getMailBox_side(srcMat, parcelMat);
 		if (isparcel == 0) {
-			pLogger->TraceInfo("Find no parcel in image");
+			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
 			return 0;
 		}
 	}
@@ -540,7 +571,7 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	}
 	catch (...)
 	{
-		pLogger->TraceWarning("handwrite OCR algorithm found exception");
+		pLogger->TraceWarning((informor + "handwrite OCR algorithm found exception").c_str());
 		pLogger->TraceWarning((std::string("exception file:")+ localimgpath).c_str());
 		//cv::imwrite("saved_file/exception.jpg", parcelMat);
 	}
@@ -548,7 +579,7 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 
 	if (res==1)
 	{
-		pLogger->TraceInfo("handwrite OCR find only destination postcode");
+		pLogger->TraceInfo((informor + "handwrite OCR find only destination postcode").c_str());
 	}
 	if (res == 0 )
 	{
@@ -557,10 +588,84 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	else
 	{
 		detected_postcodes.push_back(post_code_str);
-		std::string info_Str = "get hand write postcode:" + post_code_str;
+		std::string info_Str = informor + "get hand write postcode:" + post_code_str;
 		pLogger->TraceInfo(info_Str.c_str());
 		return 1;
 	}
+	return 0;
+}
+
+int ImgprcTask::GetPostcodeFromArbitTag(const std::string &localimgpath, bool isTopView, OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes)
+{
+
+	string taskid;
+	taskid.append((char*)(this->m_TaskID), 6);
+	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]Arbitrary tag:";
+	HWDigitsOCR hw_digits_ocr;
+	cv::Mat srcMat = cv::imread(localimgpath);
+	if (srcMat.empty())
+	{
+		pLogger->TraceWarning((informor + "Image file is empty").c_str());
+		return 0;
+	}
+	cv::Mat parcelMat;
+	CutParcelBox cutparcel;
+	if (isTopView)//针对顶视图 和侧视图 分别做处理
+	{
+		int isparcel = 0;
+		try
+		{
+			hw_digits_ocr.getTrayMat(srcMat, parcelMat);
+			isparcel = cutparcel.getMailBox_Mat(parcelMat, parcelMat);
+		}
+		catch (...)
+		{
+			pLogger->TraceWarning((informor + "Find Parcel Box exception!").c_str());
+		}
+
+		if (isparcel == 0) {
+			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
+			return 0;
+		}
+	}
+	else
+	{
+		int isparcel = cutparcel.getMailBox_side(srcMat, parcelMat);
+		if (isparcel == 0) {
+			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
+			return 0;
+		}
+	}
+
+	ArbitTagOCR arbtagocr;
+	std::string post_code_str;
+
+	int  res = 0;
+	try
+	{
+		res = arbtagocr.getPostCodeString(parcelMat, post_code_str, pOcrConifg);
+
+	}
+	catch (...)
+	{
+		pLogger->TraceWarning((informor + "Arbitary tag OCR algorithm found exception").c_str());
+		pLogger->TraceWarning((std::string("exception file:") + localimgpath).c_str());
+		//cv::imwrite("saved_file/exception.jpg", parcelMat);
+	}
+
+	if (res>0)
+	{
+
+		if (post_code_str.length() == 9 || post_code_str.length() == 10)
+		{
+			std::string::iterator it = post_code_str.begin() + 5;
+			post_code_str.insert(it, '-');
+		}
+
+		detected_postcodes.push_back(post_code_str);
+		return 1;
+	}
+	
 	return 0;
 }
 

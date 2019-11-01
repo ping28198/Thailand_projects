@@ -109,34 +109,34 @@ END
 
 IDR_MAINFRAME MENU
 BEGIN
-    POPUP "文件(&F)"
+    POPUP "File(&F)"
     BEGIN
-        MENUITEM "新建(&N)\tCtrl+N",              ID_FILE_NEW
-        MENUITEM "打开(&O)...\tCtrl+O",           ID_FILE_OPEN
-        MENUITEM "保存(&S)\tCtrl+S",              ID_FILE_SAVE
-        MENUITEM "另存为(&A)...",                  ID_FILE_SAVE_AS
+        MENUITEM "New(&N)\tCtrl+N",             ID_FILE_NEW
+        MENUITEM "Open(&O)...\tCtrl+O",         ID_FILE_OPEN
+        MENUITEM "Save(&S)\tCtrl+S",            ID_FILE_SAVE
+        MENUITEM "Save as(&A)...",              ID_FILE_SAVE_AS
         MENUITEM SEPARATOR
-        MENUITEM "最近的文件",                       ID_FILE_MRU_FILE1, GRAYED
+        MENUITEM "Recent document",             ID_FILE_MRU_FILE1, GRAYED
         MENUITEM SEPARATOR
-        MENUITEM "退出(&X)",                      ID_APP_EXIT
+        MENUITEM "Exit(&X)",                    ID_APP_EXIT
     END
-    POPUP "编辑(&E)"
+    POPUP "Eidt(&E)"
     BEGIN
-        MENUITEM "撤消(&U)\tCtrl+Z",              ID_EDIT_UNDO
+        MENUITEM "Undo(&U)\tCtrl+Z",            ID_EDIT_UNDO
         MENUITEM SEPARATOR
-        MENUITEM "剪切(&T)\tCtrl+X",              ID_EDIT_CUT
-        MENUITEM "复制(&C)\tCtrl+C",              ID_EDIT_COPY
-        MENUITEM "粘贴(&P)\tCtrl+V",              ID_EDIT_PASTE
-        MENUITEM "模拟任务发送",                      ID_TEST_SENDREQ
+        MENUITEM "Cut(&T)\tCtrl+X",             ID_EDIT_CUT
+        MENUITEM "Copy(&C)\tCtrl+C",            ID_EDIT_COPY
+        MENUITEM "Paste(&P)\tCtrl+V",           ID_EDIT_PASTE
+        MENUITEM "Test send message",           ID_TEST_SENDREQ
     END
-    POPUP "视图(&V)"
+    POPUP "View(&V)"
     BEGIN
-        MENUITEM "工具栏(&T)",                     ID_VIEW_TOOLBAR
-        MENUITEM "状态栏(&S)",                     ID_VIEW_STATUS_BAR
+        MENUITEM "Tool bar(&T)",                ID_VIEW_TOOLBAR
+        MENUITEM "Status bar(&S)",              ID_VIEW_STATUS_BAR
     END
-    POPUP "帮助(&H)"
+    POPUP "Help(&H)"
     BEGIN
-        MENUITEM "关于 ImgprcOCRInstance(&A)...", ID_APP_ABOUT
+        MENUITEM "about ImgprcOCRInstance(&A)...", ID_APP_ABOUT
     END
 END
 
@@ -171,13 +171,13 @@ END
 
 IDD_ABOUTBOX DIALOGEX 0, 0, 170, 62
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
-CAPTION "关于 ImgprcOCRInstance"
+CAPTION "About ImgprcOCRInstance"
 FONT 9, "MS Shell Dlg", 0, 0, 0x1
 BEGIN
     ICON            IDR_MAINFRAME,IDC_STATIC,14,14,20,20
     LTEXT           "ImgprcOCRInstance, Version 2.0",IDC_STATIC,42,14,114,8,SS_NOPREFIX
-    LTEXT           "Copyright (C) 2017",IDC_STATIC,42,26,114,8
-    DEFPUSHBUTTON   "确定",IDOK,113,41,50,14,WS_GROUP
+    LTEXT           "Copyright (C) 2019",IDC_STATIC,42,26,114,8
+    DEFPUSHBUTTON   "OK",IDOK,113,41,50,14,WS_GROUP
 END
 
 IDD_IMGPRCOCRINSTANCE_FORM DIALOGEX 0, 0, 683, 354
@@ -225,21 +225,21 @@ VS_VERSION_INFO VERSIONINFO
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
-        BLOCK "080403a8"
+        BLOCK "000903a8"
         BEGIN
             VALUE "CompanyName", "CPTE"
-            VALUE "FileDescription", "图像处理程序OCR"
+            VALUE "FileDescription", "Image Process Program OCR"
             VALUE "FileVersion", "1.0.0.0"
             VALUE "InternalName", "ImgprcOCRInstance.exe"
-            VALUE "LegalCopyright", "(C) <中邮科技有限责任公司>。保留所有权利。"
+            VALUE "LegalCopyright", "(C) <China post technology co. LTD>, All rights reserved."
             VALUE "OriginalFilename", "ImgprcOCRInstance.exe"
-            VALUE "ProductName", "图像处理程序OCR"
+            VALUE "ProductName", "Image Process Program OCR"
             VALUE "ProductVersion", "1.0.0.0"
         END
     END
     BLOCK "VarFileInfo"
     BEGIN
-        VALUE "Translation", 0x804, 936
+        VALUE "Translation", 0x9, 936
     END
 END
 
@@ -281,6 +281,11 @@ BEGIN
     0
 END
 
+IDD_ABOUTBOX AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
 
 /////////////////////////////////////////////////////////////////////////////
 //
@@ -289,7 +294,7 @@ END
 
 STRINGTABLE
 BEGIN
-    IDP_OLE_INIT_FAILED     "OLE 初始化失败。请确保 OLE 库是正确的版本。"
+    IDP_OLE_INIT_FAILED     "OLE initialization failed.Make sure the OLE library is the correct version."
 END
 
 STRINGTABLE
@@ -300,7 +305,7 @@ END
 STRINGTABLE
 BEGIN
     AFX_IDS_APP_TITLE       "ImgprcOCRInstance"
-    AFX_IDS_IDLEMESSAGE     "就绪"
+    AFX_IDS_IDLEMESSAGE     "OK"
 END
 
 STRINGTABLE
@@ -315,89 +320,215 @@ END
 
 STRINGTABLE
 BEGIN
-    ID_FILE_NEW             "创建新文档\n新建"
-    ID_FILE_OPEN            "打开现有文档\n打开"
-    ID_FILE_CLOSE           "关闭活动文档\n关闭"
-    ID_FILE_SAVE            "保存活动文档\n保存"
-    ID_FILE_SAVE_AS         "用新名称保存活动文档\n另存为"
+    ID_FILE_NEW             "Create a new document\nNew"
+    ID_FILE_OPEN            "Open an existing document\nOpen"
+    ID_FILE_CLOSE           "Close the active document\nClose"
+    ID_FILE_SAVE            "Save the active document\nSave"
+    ID_FILE_SAVE_AS         "Save the active document with a new name\nSave As"
 END
 
 STRINGTABLE
 BEGIN
-    ID_APP_ABOUT            "显示程序信息、版本号和版权\n关于"
-    ID_APP_EXIT             "退出应用程序；提示保存文档\n退出"
+    ID_APP_ABOUT            "Display program information, version number and copyright\nAbout"
+    ID_APP_EXIT             "Quit the application; prompts to save documents\nExit"
 END
 
 STRINGTABLE
 BEGIN
-    ID_FILE_MRU_FILE1       "打开此文档"
-    ID_FILE_MRU_FILE2       "打开此文档"
-    ID_FILE_MRU_FILE3       "打开此文档"
-    ID_FILE_MRU_FILE4       "打开此文档"
-    ID_FILE_MRU_FILE5       "打开此文档"
-    ID_FILE_MRU_FILE6       "打开此文档"
-    ID_FILE_MRU_FILE7       "打开此文档"
-    ID_FILE_MRU_FILE8       "打开此文档"
-    ID_FILE_MRU_FILE9       "打开此文档"
-    ID_FILE_MRU_FILE10      "打开此文档"
-    ID_FILE_MRU_FILE11      "打开此文档"
-    ID_FILE_MRU_FILE12      "打开此文档"
-    ID_FILE_MRU_FILE13      "打开此文档"
-    ID_FILE_MRU_FILE14      "打开此文档"
-    ID_FILE_MRU_FILE15      "打开此文档"
-    ID_FILE_MRU_FILE16      "打开此文档"
+    ID_FILE_MRU_FILE1       "Open this document"
+    ID_FILE_MRU_FILE2       "Open this document"
+    ID_FILE_MRU_FILE3       "Open this document"
+    ID_FILE_MRU_FILE4       "Open this document"
+    ID_FILE_MRU_FILE5       "Open this document"
+    ID_FILE_MRU_FILE6       "Open this document"
+    ID_FILE_MRU_FILE7       "Open this document"
+    ID_FILE_MRU_FILE8       "Open this document"
+    ID_FILE_MRU_FILE9       "Open this document"
+    ID_FILE_MRU_FILE10      "Open this document"
+    ID_FILE_MRU_FILE11      "Open this document"
+    ID_FILE_MRU_FILE12      "Open this document"
+    ID_FILE_MRU_FILE13      "Open this document"
+    ID_FILE_MRU_FILE14      "Open this document"
+    ID_FILE_MRU_FILE15      "Open this document"
+    ID_FILE_MRU_FILE16      "Open this document"
 END
 
 STRINGTABLE
 BEGIN
-    ID_NEXT_PANE            "切换到下一个窗格\n下一窗格"
-    ID_PREV_PANE            "切换回上一个窗格\n上一窗格"
+    ID_NEXT_PANE            "Switch to the next window pane\nNext Pane"
+    ID_PREV_PANE            "Switch back to the previous window pane\nPrevious Pane"
 END
 
 STRINGTABLE
 BEGIN
-    ID_WINDOW_SPLIT         "将活动窗口拆分为多个窗格\n拆分"
+    ID_WINDOW_SPLIT         "Split the active window into panes\nSplit"
 END
 
 STRINGTABLE
 BEGIN
-    ID_EDIT_CLEAR           "清除选定内容\n清除"
-    ID_EDIT_CLEAR_ALL       "清除全部内容\n全部清除"
-    ID_EDIT_COPY            "复制选定内容并将其放到剪贴板上\n复制"
-    ID_EDIT_CUT             "剪切选定内容并将其放到剪贴板上\n剪切"
-    ID_EDIT_FIND            "查找指定的文本\n查找"
-    ID_EDIT_PASTE           "插入剪贴板内容\n粘贴"
-    ID_EDIT_REPEAT          "重复上一操作\n重复"
-    ID_EDIT_REPLACE         "用其他文本替换特定的文本\n替换"
-    ID_EDIT_SELECT_ALL      "选定整个文档\n全选"
-    ID_EDIT_UNDO            "撤消上一操作\n撤消"
-    ID_EDIT_REDO            "恢复上次撤消的操作\n重做"
+    ID_EDIT_CLEAR           "Erase the selection\nErase"
+    ID_EDIT_CLEAR_ALL       "Erase everything\nErase All"
+    ID_EDIT_COPY            "Copy the selection and put it on the Clipboard\nCopy"
+    ID_EDIT_CUT             "Cut the selection and put it on the Clipboard\nCut"
+    ID_EDIT_FIND            "Find the specified text\nFind"
+    ID_EDIT_PASTE           "Insert Clipboard contents\nPaste"
+    ID_EDIT_REPEAT          "Repeat the last action\nRepeat"
+    ID_EDIT_REPLACE         "Replace specific text with different text\nReplace"
+    ID_EDIT_SELECT_ALL      "Select the entire document\nSelect All"
+    ID_EDIT_UNDO            "Undo the last action\nUndo"
+    ID_EDIT_REDO            "Redo the previously undone action\nRedo"
 END
 
 STRINGTABLE
 BEGIN
-    ID_VIEW_TOOLBAR         "显示或隐藏工具栏\n切换工具栏"
-    ID_VIEW_STATUS_BAR      "显示或隐藏状态栏\n切换状态栏"
+    ID_VIEW_TOOLBAR         "Show or hide toolbar \n Toggle toolbar"
+    ID_VIEW_STATUS_BAR      "Show or hide status bar \n Toggle status bar"
 END
 
 STRINGTABLE
 BEGIN
-    AFX_IDS_SCSIZE          "更改窗口大小"
-    AFX_IDS_SCMOVE          "更改窗口位置"
-    AFX_IDS_SCMINIMIZE      "将窗口缩小为图标"
-    AFX_IDS_SCMAXIMIZE      "使窗口最大化显示"
-    AFX_IDS_SCNEXTWINDOW    "切换到下一个文档窗口"
-    AFX_IDS_SCPREVWINDOW    "切换到前一个文档窗口"
-    AFX_IDS_SCCLOSE         "关闭活动窗口并提示保存文档"
+    AFX_IDS_SCSIZE          "Change window size"
+    AFX_IDS_SCMOVE          "Change window position"
+    AFX_IDS_SCMINIMIZE      "Shrink the window to an icon"
+    AFX_IDS_SCMAXIMIZE      "Maximize window display"
+    AFX_IDS_SCNEXTWINDOW    "Switch to the next document window"
+    AFX_IDS_SCPREVWINDOW    "Switch to the previous document window"
+    AFX_IDS_SCCLOSE         "Close the active window and prompt to save the document"
 END
 
 STRINGTABLE
 BEGIN
-    AFX_IDS_SCRESTORE       "将窗口恢复到正常大小"
-    AFX_IDS_SCTASKLIST      "激活任务列表"
+    AFX_IDS_SCRESTORE       "Restore the window to its normal size"
+    AFX_IDS_SCTASKLIST      "Activate task list"
 END
 
 #endif    // 中文(简体，中国) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// 英语 resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+LANGUAGE LANG_ENGLISH, SUBLANG_NEUTRAL
+#pragma code_page(1252)
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDP_OLE_INIT_FAILED     "OLE initialization failed.Make sure the OLE library is the correct version."
+END
+
+STRINGTABLE
+BEGIN
+    IDR_MAINFRAME           "ImgprcOCRInstance\n\nImgprcOCRInstan\n\n\nImgprcOCRInstance.Document\nImgprcOCRInstance.Document"
+END
+
+STRINGTABLE
+BEGIN
+    AFX_IDS_APP_TITLE       "ImgprcOCRInstance"
+    AFX_IDS_IDLEMESSAGE     "OK"
+END
+
+STRINGTABLE
+BEGIN
+    ID_INDICATOR_EXT        "EXT"
+    ID_INDICATOR_CAPS       "CAP"
+    ID_INDICATOR_NUM        "NUM"
+    ID_INDICATOR_SCRL       "SCRL"
+    ID_INDICATOR_OVR        "OVR"
+    ID_INDICATOR_REC        "REC"
+END
+
+STRINGTABLE
+BEGIN
+    ID_FILE_NEW             "Create a new document\nNew"
+    ID_FILE_OPEN            "Open an existing document\nOpen"
+    ID_FILE_CLOSE           "Close the active document\nClose"
+    ID_FILE_SAVE            "Save the active document\nSave"
+    ID_FILE_SAVE_AS         "Save the active document with a new name\nSave As"
+END
+
+STRINGTABLE
+BEGIN
+    ID_APP_ABOUT            "Display program information, version number and copyright\nAbout"
+    ID_APP_EXIT             "Quit the application; prompts to save documents\nExit"
+END
+
+STRINGTABLE
+BEGIN
+    ID_FILE_MRU_FILE1       "Open this document"
+    ID_FILE_MRU_FILE2       "Open this document"
+    ID_FILE_MRU_FILE3       "Open this document"
+    ID_FILE_MRU_FILE4       "Open this document"
+    ID_FILE_MRU_FILE5       "Open this document"
+    ID_FILE_MRU_FILE6       "Open this document"
+    ID_FILE_MRU_FILE7       "Open this document"
+    ID_FILE_MRU_FILE8       "Open this document"
+    ID_FILE_MRU_FILE9       "Open this document"
+    ID_FILE_MRU_FILE10      "Open this document"
+    ID_FILE_MRU_FILE11      "Open this document"
+    ID_FILE_MRU_FILE12      "Open this document"
+    ID_FILE_MRU_FILE13      "Open this document"
+    ID_FILE_MRU_FILE14      "Open this document"
+    ID_FILE_MRU_FILE15      "Open this document"
+    ID_FILE_MRU_FILE16      "Open this document"
+END
+
+STRINGTABLE
+BEGIN
+    ID_NEXT_PANE            "Switch to the next window pane\nNext Pane"
+    ID_PREV_PANE            "Switch back to the previous window pane\nPrevious Pane"
+END
+
+STRINGTABLE
+BEGIN
+    ID_WINDOW_SPLIT         "Split the active window into panes\nSplit"
+END
+
+STRINGTABLE
+BEGIN
+    ID_EDIT_CLEAR           "Erase the selection\nErase"
+    ID_EDIT_CLEAR_ALL       "Erase everything\nErase All"
+    ID_EDIT_COPY            "Copy the selection and put it on the Clipboard\nCopy"
+    ID_EDIT_CUT             "Cut the selection and put it on the Clipboard\nCut"
+    ID_EDIT_FIND            "Find the specified text\nFind"
+    ID_EDIT_PASTE           "Insert Clipboard contents\nPaste"
+    ID_EDIT_REPEAT          "Repeat the last action\nRepeat"
+    ID_EDIT_REPLACE         "Replace specific text with different text\nReplace"
+    ID_EDIT_SELECT_ALL      "Select the entire document\nSelect All"
+    ID_EDIT_UNDO            "Undo the last action\nUndo"
+    ID_EDIT_REDO            "Redo the previously undone action\nRedo"
+END
+
+STRINGTABLE
+BEGIN
+    ID_VIEW_TOOLBAR         "Show or hide toolbar \n Toggle toolbar"
+    ID_VIEW_STATUS_BAR      "Show or hide status bar \n Toggle status bar"
+END
+
+STRINGTABLE
+BEGIN
+    AFX_IDS_SCSIZE          "Change window size"
+    AFX_IDS_SCMOVE          "Change window position"
+    AFX_IDS_SCMINIMIZE      "Shrink the window to an icon"
+    AFX_IDS_SCMAXIMIZE      "Maximize window display"
+    AFX_IDS_SCNEXTWINDOW    "Switch to the next document window"
+    AFX_IDS_SCPREVWINDOW    "Switch to the previous document window"
+    AFX_IDS_SCCLOSE         "Close the active window and prompt to save the document"
+END
+
+STRINGTABLE
+BEGIN
+    AFX_IDS_SCRESTORE       "Restore the window to its normal size"
+    AFX_IDS_SCTASKLIST      "Activate task list"
+END
+
+#endif    // 英语 resources
 /////////////////////////////////////////////////////////////////////////////
 
 

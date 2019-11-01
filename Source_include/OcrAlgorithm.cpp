@@ -131,10 +131,10 @@ int OcrAlgorithm::getOcrResultString(Mat src_img,tesseract::TessBaseAPI *pTess, 
 		}
 	}
 
-	if (pConfig->pLogger != NULL)
-	{
-		((Logger*)(pConfig->pLogger))->TraceInfo("Apply sift match!");
-	}
+	//if (pConfig->pLogger != NULL)
+	//{
+	//	((Logger*)(pConfig->pLogger))->TraceInfo("Apply sift match!");
+	//}
 
 	printf("采用SIFT匹配矫正\n");
 	cv::Mat rotatedImg1, rotatedImg2;
@@ -5543,4 +5543,283 @@ int HWDigitsOCR::getTrayMat(cv::Mat &srcMat, cv::Mat &dstMat)
 
 	dstMat = srcMat(cropr).clone();
 	return 1;
+}
+
+
+int renameBarcodeImage()
+{
+	string imgdir = "";
+	vector<string> filelist;
+	CommonFunc::getAllFilesNameInDir(imgdir, filelist, false, true);
+	for (int i=0;i<filelist.size();i++)
+	{
+		string _dir, _filename;
+		CommonFunc::splitDirectoryAndFilename(filelist[i], _dir, _filename);
+		string prename;
+		size_t pos = _filename.find('.');
+		if (pos==_filename.npos)
+		{
+			cout << "error, no dohao:"<<_filename<<endl;
+			continue;
+		}
+		prename = _filename.substr(0, pos);
+		pos = prename.find_last_of('_');
+		if (pos==prename.npos)
+		{
+			cout << "error, no _:" <<_filename<< endl;
+			continue;
+		}
+		string typestr = prename.substr(pos+1);
+		pos = prename.find_first_of('_');
+		string codestr = prename.substr(pos);
+		if (codestr.size()!=13)
+		{
+			cout << "条形码位数不对" << _filename << endl;
+			continue;
+		}
+		if (typestr=="D1")
+		{
+
+		}
+		if (typestr=="D2")
+		{
+
+		}
+
+
+	}
+
+
+}
+
+int ArbitTagOCR::getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat)
+{
+	if (srcParcelMat.rows>srcParcelMat.cols)
+	{
+		rotate(srcParcelMat, srcParcelMat, ROTATE_90_CLOCKWISE);
+	}
+	Mat sm = srcParcelMat.clone();
+	double scal_ = 1000.0f / max(sm.cols, sm.rows);
+	resize(sm, sm, cv::Size(), scal_, scal_);
+	if (sm.channels() == 3)
+	{
+		cvtColor(sm, sm, COLOR_BGR2GRAY);
+	}
+	//imshow("sm", sm);
+	int mht = sm.rows;
+	int mwd = sm.cols;
+	float avgpix = ImageProcessFunc::getAverageBrightness(sm);
+
+	threshold(sm, sm, avgpix+(255-avgpix)*0.2, 255, THRESH_BINARY);
+
+	Mat melement = getStructuringElement(MORPH_RECT, cv::Size(5, 5));
+	morphologyEx(sm, sm, MORPH_CLOSE, melement);
+
+	melement = getStructuringElement(MORPH_RECT, cv::Size(3, 3));
+	morphologyEx(sm, sm, MORPH_ERODE, melement);
+
+#ifdef ARBIT_TAG_DEBUG
+	imshow("bnm", sm);
+#endif // _DEBUG
+
+	vector<vector<Point>> contours;
+	findContours(sm, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+	int maxind = -1;
+	double maxarea = 0;
+	for (int i=0;i<contours.size();i++)
+	{
+		double marea = contourArea(contours[i]);
+		if (maxarea<marea)
+		{
+			maxind = i;
+			maxarea = marea;
+		}
+	}
+	if (maxind == -1)
+	{
+		return 0;
+	}
+	if (maxarea<50000)
+	{
+		return 0;
+	}
+	vector<Point> mcountour = contours[maxind];
+	RotatedRect rtr;
+	rtr = minAreaRect(mcountour);
+	bool needrotate = false;
+	if (rtr.center.x < sm.cols/2)
+	{
+		needrotate = true;
+	}
+	rtr.center.x /= scal_;
+	rtr.center.y /= scal_;
+	rtr.size.width /= scal_;
+	rtr.size.height /= scal_;
+	Mat tagMat;
+	ImageProcessFunc::getMatFromRotatedRect(srcParcelMat, tagMat, rtr);
+	if (needrotate)
+	{
+		cout << "needrotate" << endl;
+		rotate(tagMat, tagMat, ROTATE_180);
+		
+	}
+	rotate(tagMat, tagMat, ROTATE_90_COUNTERCLOCKWISE);
+	tagMat.copyTo(dstTagMat);
+	return 1;
+}
+bool sortRectYaxis(Rect r1, Rect r2)
+{
+	return r1.y < r2.y;
+}
+
+int ArbitTagOCR::getPostCodeString(cv::Mat srcMat, std::string &postcode, OcrAlgorithm_config* pConfig)
+{
+	Mat mtag;
+	getTag(srcMat, mtag);
+	if (mtag.empty())
+	{
+		return 0;
+	}
+	if (mtag.channels()==3)
+	{
+		cvtColor(mtag, mtag, COLOR_BGR2GRAY);
+	}
+	int margin_x = mtag.cols*0.1;
+	int margin_y = mtag.rows*0.1;
+	Rect r;
+	r.x = margin_x;
+	r.y = margin_y;
+	r.width = mtag.cols - margin_x * 2;
+	r.height = mtag.rows - margin_y * 2;
+	mtag = mtag(r);
+	
+	Mat bntag;
+	double scal_ = 640.0/max(mtag.cols, mtag.rows);
+	resize(mtag, bntag, Size(), scal_, scal_);
+
+	double avgpix = ImageProcessFunc::getAverageBrightness(mtag);
+	threshold(bntag, bntag, avgpix/1.75, 255, THRESH_BINARY);
+	
+	bntag = ~bntag;
+
+	Mat melement = getStructuringElement(MORPH_RECT, cv::Size(30, 2));
+	morphologyEx(bntag, bntag, MORPH_CLOSE, melement);
+
+	melement = getStructuringElement(MORPH_RECT, cv::Size(5, 5));
+	morphologyEx(bntag, bntag, MORPH_ERODE, melement);
+
+	//melement = getStructuringElement(MORPH_RECT, cv::Size(3, 3));
+	//morphologyEx(mtag, mtag, MORPH_ERODE, melement);
+
+#ifdef ARBIT_TAG_DEBUG
+	imshow("bnm", bntag);
+#endif // ARBIT_TAG_DEBUG
+
+	vector<vector<Point>> contours;
+	findContours(bntag, contours, cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+	vector<vector<Point>>::iterator it;
+	for (it=contours.begin();it!=contours.end();)
+	{
+		double mare = contourArea(*it);
+		if (mare<200)
+		{
+			it = contours.erase(it);
+		}
+		else
+		{
+			it++;
+		}
+	}
+	vector<Rect> rectvec;
+	for (it = contours.begin(); it != contours.end();it++)
+	{
+		Rect r;
+		ImageProcessFunc::getContourRect(*it, r);
+		int margin_x = r.height * 2;
+		int margin_y = r.height*0.5;
+		r.x -= margin_x;
+		r.width += margin_x * 2;
+		r.y -= margin_y;
+		r.height += margin_y * 2;
+		rectvec.push_back(r);
+	}
+	sort(rectvec.begin(), rectvec.end(),sortRectYaxis);
+	vector<Mat> mvec;
+	for (int i=0;i<rectvec.size();i++)
+	{
+		Rect r = rectvec[i];
+		r.x /= scal_;
+		r.y /= scal_;
+		r.width /= scal_;
+		r.height /= scal_;
+		ImageProcessFunc::CropRect(Rect(0, 0, mtag.cols, mtag.rows), r);
+		mvec.push_back(mtag(r).clone());
+	}
+	OcrAlgorithm ocralg;
+	string _postcode = "";
+	for (int i= mvec.size()-1;i>=0;i--)
+	{
+		string mstr = runOCR(mvec[i], pConfig);
+		bool isok = ocralg.isStanderPostcode(mstr,_postcode);
+		if (isok)
+		{
+			postcode = _postcode;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+std::string ArbitTagOCR::runOCR(cv::Mat &srcMat, OcrAlgorithm_config* pConfig)
+{
+	if (srcMat.empty())
+	{
+		return "";
+	}
+	int h = srcMat.rows;
+	int sh = 30;
+	float scal_ = sh / float(h);
+	cv::Mat resizedMat = srcMat;
+	if (scal_ > 1.1)
+	{
+		cv::resize(srcMat, resizedMat, cv::Size(), scal_, scal_, cv::INTER_AREA);
+	}
+
+	//cv::Rect mR;
+	//mR.x = 0;
+	//mR.y = 0;
+	//mR.height = resizedMat.rows;
+	//mR.width = resizedMat.cols / 4;
+
+//#ifdef OCR_DEBUG
+//	imshow("_runOcr调整亮度前", resizedMat);
+//#endif // OCR_DEBUG
+	double vPix = ImageProcessFunc::getAverageBrightness(resizedMat);
+	double anchor = vPix/1.75;
+	double alpha = 3.0;
+	double beta = 200 - vPix;
+	ImageProcessFunc::adJustBrightness(resizedMat, alpha, beta, anchor);
+	//imshow("roi", resizedMat);
+
+	
+
+	int w = resizedMat.cols;
+	h = resizedMat.rows;
+	unsigned char *pImgData = resizedMat.data;
+
+	
+	tesseract::TessBaseAPI* pTess = (tesseract::TessBaseAPI*)(pConfig->pTess);
+
+	pTess->SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_LINE);
+	//pTess->SetVariable("save_best_choices", "T");
+	pTess->SetVariable("classify_bln_numeric_mode", "1");
+	pTess->SetImage(resizedMat.data, w, h, resizedMat.channels(), resizedMat.step1());
+	pTess->Recognize(0);
+
+	// get result and delete[] returned char* string
+	char pResults[512] = { 0 };
+	strcpy_s(pResults, 512, pTess->GetUTF8Text());
+
+	return string(pResults);
+
 }

@@ -110,6 +110,8 @@ public:
 	int DeleteLocalCacheFile(Logger *pLogger);
 	int GetPostcodeFromHandwrite(const std::string &localimgpath, bool isTopView,
 		OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes);
+	int GetPostcodeFromArbitTag(const std::string &localimgpath, bool isTopView,
+		OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes);
 	BYTE GetNextProcessType(OcrAlgorithm_config *pOcrConifg);
 public:
 	static int splitStrByChar(char sC, const char * srcString, std::vector<std::string> &rStrVec); //·Ö¸î×Ö·û´®
