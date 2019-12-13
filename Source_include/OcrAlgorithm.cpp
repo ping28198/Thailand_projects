@@ -5610,7 +5610,7 @@ int ArbitTagOCR::getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat)
 	int mwd = sm.cols;
 	float avgpix = ImageProcessFunc::getAverageBrightness(sm);
 
-	threshold(sm, sm, avgpix+(255-avgpix)*0.2, 255, THRESH_BINARY);
+	threshold(sm, sm, avgpix+(255-avgpix)*0.3, 255, THRESH_BINARY);
 
 	Mat melement = getStructuringElement(MORPH_RECT, cv::Size(5, 5));
 	morphologyEx(sm, sm, MORPH_CLOSE, melement);
@@ -5619,7 +5619,7 @@ int ArbitTagOCR::getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat)
 	morphologyEx(sm, sm, MORPH_ERODE, melement);
 
 #ifdef ARBIT_TAG_DEBUG
-	imshow("bnm", sm);
+	imshow("box_bnm", sm);
 #endif // _DEBUG
 
 	vector<vector<Point>> contours;
@@ -5639,13 +5639,14 @@ int ArbitTagOCR::getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat)
 	{
 		return 0;
 	}
-	if (maxarea<50000)
+	if (maxarea<30000)
 	{
 		return 0;
 	}
 	vector<Point> mcountour = contours[maxind];
 	RotatedRect rtr;
 	rtr = minAreaRect(mcountour);
+	cout <<"angle:"<< rtr.angle << endl;
 	bool needrotate = false;
 	if (rtr.center.x < sm.cols/2)
 	{
@@ -5657,13 +5658,17 @@ int ArbitTagOCR::getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat)
 	rtr.size.height /= scal_;
 	Mat tagMat;
 	ImageProcessFunc::getMatFromRotatedRect(srcParcelMat, tagMat, rtr);
+	if (rtr.angle<-45)
+	{
+		rotate(tagMat, tagMat, ROTATE_90_COUNTERCLOCKWISE);
+	}
 	if (needrotate)
 	{
 		cout << "needrotate" << endl;
 		rotate(tagMat, tagMat, ROTATE_180);
 		
 	}
-	rotate(tagMat, tagMat, ROTATE_90_COUNTERCLOCKWISE);
+	
 	tagMat.copyTo(dstTagMat);
 	return 1;
 }
@@ -5696,6 +5701,10 @@ int ArbitTagOCR::getPostCodeString(cv::Mat srcMat, std::string &postcode, OcrAlg
 	Mat bntag;
 	double scal_ = 640.0/max(mtag.cols, mtag.rows);
 	resize(mtag, bntag, Size(), scal_, scal_);
+
+#ifdef ARBIT_TAG_DEBUG
+	imshow("tagmat", mtag);
+#endif // ARBIT_TAG_DEBUG
 
 	double avgpix = ImageProcessFunc::getAverageBrightness(mtag);
 	threshold(bntag, bntag, avgpix/1.75, 255, THRESH_BINARY);

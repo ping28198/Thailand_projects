@@ -12,6 +12,7 @@
 using namespace cv;
 using namespace std;
 
+#define IMAGE_NOT_EXIST -1
 #define IS_BAR_MAX_LEN  51					//条码的最大长度
 #define IS_BAR_MAX_NUM	3					//最大条码个数
 #define IS_IMAGE_MAX_PATH		512			//文件路径名最大长度
@@ -32,6 +33,12 @@ using namespace std;
 
 #define ST_TASK_PROCESSED 3
 #define IS_MAX_IMG_PER_TASK 6				//每个任务的最大图片数量
+
+#define ST_TASK_RESULT_OK 1
+#define ST_TASK_RESULT_NO_IMAGE 11
+#define ST_TASK_RESULT_NO_POSTCODE 12
+#define ST_TASK_RESULT_MUL_POSTCODE 13
+
 
 
 
@@ -81,7 +88,7 @@ public:
 	char m_chsBarcode[IS_BAR_MAX_LEN]; //服务器发过来的条码（暂时无用，直接返回）
 	//char m_chsOCRResult[IS_OCR_MAX_LENGTH];
 	char m_chsOcrPostcode[IS_POSTCODE_MAX_LEN]; //存储ocr结果，多个用；分开
-
+	cv::Mat* pSrcMat;
 	//BYTE m_image_processed_count; //已经处理的任务计数
 	int m_postcodeNum;//=0未获得邮编，=1 获得一个邮编，= 2 获得两个邮编..
 	//BYTE m_bFlag;
@@ -113,6 +120,9 @@ public:
 	int GetPostcodeFromArbitTag(const std::string &localimgpath, bool isTopView,
 		OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes);
 	BYTE GetNextProcessType(OcrAlgorithm_config *pOcrConifg);
+	int PreloadImage2Mat(Logger *pLogger);//预加载图片并裁剪出parcel
+	int ReleaseMat();
+	string ImageID_str();
 public:
 	static int splitStrByChar(char sC, const char * srcString, std::vector<std::string> &rStrVec); //分割字符串
 };

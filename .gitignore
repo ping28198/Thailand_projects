@@ -4,6 +4,7 @@
 ### C++ ###
 # Prerequisites
 *.d
+Projects/_run_dir/saved_ng_file/
 
 # Compiled Object files
 *.slo

@@ -54,7 +54,8 @@ int main()
 
 	//cout << "误差：" << e << endl;
 
-
+	Mat m = imread("F:\\CommonDatasets\\ILSVRC2017Download\\tiny-imagenet-200\\test\\images\\test_0.JPEG");
+	cout << ImageProcessFunc::getAverageBrightness(m) << endl;
 
 
 	//cout << a << endl;
@@ -65,8 +66,7 @@ int main()
 	//CString s;
 	
 	//testGetTray();
-	HWdigitsOCR_for_test();
-
+	//HWdigitsOCR_for_test();
 
 	//cout << CommonFunc::get_exe_dir()<<endl;
 
@@ -1328,24 +1328,70 @@ int testGetTray()
 {
 
 	vector<string> imgfiles;
-	string dir = "F:\\泰国ocr\\OBR1\\*.jpg";
-	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);
-	HWDigitsOCR hd;
+	string dir = "F:\\泰国ocr\\pic2\\1\\*.jpg";
+	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
+	ArbitTagOCR art;
 	cout << imgfiles.size() << endl;
 	for (int i=0;i<imgfiles.size();i++)
 	{
 		//if (i<112) continue;
 
-		cout << i << endl;
+		cout << imgfiles[i] << endl;
 		Mat m = imread(imgfiles[i]);
 		Mat dm;
-		hd.getTrayMat(m, dm);
+		art.getTag(m, dm);
 		resize(dm, dm, cv::Size(), 0.2, 0.2);
 		imshow("dm", dm);
 
 		waitKey(0);
 	}
 
+	//double angle_ = -90;
+	//for (int i=0;i<18;i++)
+	//{
+	//	Mat m = Mat::zeros(Size(500, 500), CV_8U);
+	//	Rect r(90, 125, 330, 250);
+	//	rectangle(m,r, Scalar(255, 255, 255), -1);
+	//	circle(m, Point(300, 250), 5, Scalar(0, 0, 0), -1);
+	//	imshow("src", m);
+	//	ImageProcessFunc::rotate_arbitrarily_angle(m, m, angle_/180*CV_PI);
+	//	//cout << "angle:" << angle_ << endl;
+	//	angle_ += 10;
+	//	
+	//	vector<vector<Point>> contours;
+	//	findContours(m, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+	//	double a = 0;
+	//	int ind = -1;
+	//	for (int j=0;j<contours.size();j++)
+	//	{
+	//		double marea = contourArea(contours[j]);
+	//		if (marea>a)
+	//		{
+	//			ind = j;
+	//			a = marea;
+	//		}
+	//	}
+	//	vector<Point> maxcontour = contours[ind];
+	//	putText(m, "1", maxcontour[0], 0, 1, Scalar(120, 0, 0));
+	//	putText(m, "2", maxcontour.back(), 0, 1, Scalar(120, 0, 0));
+	//	imshow("rm", m);
+	//	RotatedRect rt;
+	//	rt = minAreaRect(maxcontour);
+	//	Mat tag;
+	//	ImageProcessFunc::getMatFromRotatedRect(m, tag, rt);
+	//	imshow("tag", tag);
+	//	cout << "rangle:" << rt.angle << endl;
+
+
+
+
+	//	waitKey(0);
+	//	if (i==17)
+	//	{
+	//		i = -1;
+	//	}
+
+	//}
 
 
 

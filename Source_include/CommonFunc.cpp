@@ -68,10 +68,13 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 	}
 	else
 	{
+		string str1;
+		char tmp[256] = { 0 };
 		do
 		{
 			// 忽略"."和".."两个结果 
-			string str1 = T2A(findData.cFileName);
+			WideCharToMultiByte(CP_ACP, 0, findData.cFileName, 256, tmp, 256, 0, 0);
+			str1 = std::string(tmp);
 			if (strcmp(str1.c_str(), ".") == 0 || strcmp(str1.c_str(), "..") == 0)
 				continue;
 			if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)    // 是否是目录 
@@ -94,9 +97,13 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 	}
 	else
 	{
+		std::string str1;
+		char tmp[256] = { 0 };
 		do
 		{
-			string str1 = T2A(findData.cFileName);
+			//WideCharToMultiByte(CP_ACP, 0, findData.cFileName, 256, tmp, 256, 0, 0);
+			//str1 = std::string(tmp);
+			str1 = CommonFunc::WCharToMChar(findData.cFileName);
 			if (strcmp(str1.c_str(), ".") == 0 || strcmp(str1.c_str(), "..") == 0)
 				continue;
 			if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)    // 是否是目录 
@@ -118,6 +125,91 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 	}
 
 	return filenames.size();
+}
+
+int CommonFunc::getAllSubDirsInDir(std::string dir, std::vector<std::string> &subdirs, bool isIncludeSubDir /*= false*/, bool isReturnPath /*= false*/)
+{
+	HANDLE hFind;
+	WIN32_FIND_DATA findData;
+	//LARGE_INTEGER size;
+	string base_dir, new_dir, suffix;
+	//dir.replace(dir.begin(), dir.end(), '\\', '/');
+	while (true)
+	{
+		int mpos = dir.find('\\');
+		if (mpos != dir.npos)
+		{
+			dir.replace(mpos, 1, "/");
+		}
+		else
+		{
+			break;
+		}
+	}
+	while (true)
+	{
+		if (dir.find_last_of('/') != (dir.size() - 1))
+		{
+			break;
+		}
+		dir.erase(dir.size() - 1);
+	}
+	base_dir = dir;
+	if (base_dir.find('*') != base_dir.npos || base_dir.find('?') != base_dir.npos)
+	{
+		int slashPos = dir.find_last_of('/');
+		if (slashPos != dir.npos)
+		{
+			suffix = base_dir.substr(slashPos + 1);
+			base_dir = base_dir.substr(0, slashPos);
+		}
+	}
+	else
+	{
+		suffix = "*.*";
+	}
+	if (isIncludeSubDir)
+	{
+		new_dir = base_dir + "/" + "*.*";
+	}
+	else
+	{
+		new_dir = base_dir + "/" + suffix;
+	}
+	USES_CONVERSION;
+	hFind = FindFirstFileW(A2T(new_dir.c_str()), &findData);
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		//cout << "Failed to find first file!\n";
+	}
+	else
+	{
+		do
+		{
+			// 忽略"."和".."两个结果
+			string str1 = T2A(findData.cFileName);
+			if (strcmp(str1.c_str(), ".") == 0 || strcmp(str1.c_str(), "..") == 0)
+				continue;
+			if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)    // 是否是目录 
+			{
+				if (isReturnPath)
+				{
+					subdirs.push_back(base_dir + '/' + str1);
+				}
+				else
+				{
+					subdirs.push_back(str1);
+				}
+				//if (isIncludeSubDir)
+				//{
+				//	getAllFilesNameInDir(base_dir + '/' + str1 + '/' + suffix, filenames, isIncludeSubDir, isReturnPath);
+				//}
+			}
+		} while (FindNextFile(hFind, &findData));
+	}
+
+
+	return subdirs.size();
 }
 
 std::string CommonFunc::get_exe_dir()
@@ -180,7 +272,14 @@ int CommonFunc::joinFilePath(std::string path1, std::string path2, std::string &
 	return 1;
 }
 
-int CommonFunc::getExtensionFilename(std::string srcPath, std::string &dstExName)
+std::string CommonFunc::joinFilePath(std::string path1, std::string path2)
+{
+	string joinedpath;
+	joinFilePath(path1, path2, joinedpath);
+	return joinedpath;
+}
+
+std::string CommonFunc::getExtensionFilename(std::string srcPath)
 {
 	size_t pos1 = srcPath.find_last_of('\\');
 	size_t pos2 = srcPath.find_last_of('/');
@@ -205,16 +304,46 @@ int CommonFunc::getExtensionFilename(std::string srcPath, std::string &dstExName
 		pos = 0;
 	}
 	string _filename = srcPath.substr(pos);
-	pos = _filename.find_first_of('.');
-	if (pos==_filename.npos)
+	string ExFilename = "";
+	pos = _filename.find_last_of('.');
+	if (pos != _filename.npos)
 	{
-		dstExName = "";
+		ExFilename = _filename.substr(pos + 1);
+	}
+	return ExFilename;
+}
+
+std::string CommonFunc::getShortFilename(std::string srcPath)
+{
+	std::string filename;
+	std::string directory;
+	splitDirectoryAndFilename(srcPath, directory, filename);
+	size_t pos = filename.find_last_of('.');
+	string shortname;
+	if (pos != filename.npos)
+	{
+		shortname = filename.substr(0, pos);
 	}
 	else
 	{
-		dstExName = _filename.substr(pos+1);
+		shortname = filename;
 	}
+	return shortname;
+}
 
-	return 1;
+const char* CommonFunc::WCharToMChar(const wchar_t* srcWChar)
+{
+	size_t wlength = wcslen(srcWChar);
+	char tmp[4096] = { 0 };
+	WideCharToMultiByte(CP_ACP, 0, srcWChar, wlength, tmp, 4096, NULL, NULL);
+	return tmp;
+}
+
+const wchar_t* CommonFunc::MCharToWChar(const char* srcChar)
+{
+	size_t slen = strlen(srcChar);
+	wchar_t wtmp[4096] = { 0 };
+	MultiByteToWideChar(CP_ACP, 0, srcChar, slen, wtmp, 4096);
+	return wtmp;
 }
 

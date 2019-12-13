@@ -42,13 +42,15 @@ int get_send_msg(unsigned char *pBuffer,vector<string> imgpaths,int istopview)
 	msg_data[newline++] = 0xC4;
 	// TaskID
 	//int id =  % 1000000;
-	char ids[10] = { '0','1','2','3','4','5','6','7','8','9'};
-	msg_data[newline++] = ids[rand()%10]; 
-	msg_data[newline++] = ids[rand() % 10]; 
-	msg_data[newline++] = ids[rand() % 10]; 
-	msg_data[newline++] = ids[rand() % 10]; 
-	msg_data[newline++] = ids[rand() % 10]; 
-	msg_data[newline++] = ids[rand() % 10];
+	//char ids[10] = { '0','1','2','3','4','5','6','7','8','9'};
+	unsigned int taskID = rand();
+	cout << "sending imageid: " << taskID << endl;
+	msg_data[newline++] = (taskID / int(pow(256,5))) %256;
+	msg_data[newline++] = (taskID / int(pow(256, 4))) % 256;
+	msg_data[newline++] = (taskID / int(pow(256, 3))) % 256;
+	msg_data[newline++] = (taskID / int(pow(256, 2))) % 256;
+	msg_data[newline++] = (taskID / int(pow(256, 1))) % 256;
+	msg_data[newline++] = (taskID / int(pow(256, 0))) % 256;
 	msg_data[newline++] = (imgpaths.size()>1)?1:4; //补码类型
 	msg_data[newline++] = imgpaths.size();
 	string img_path_tmp;
@@ -170,7 +172,7 @@ int server()
 	vector<string> imgpathvec_side;
 	string imgdir_side = "F:/shared_data_original/side/*.jpg";
 	string imgdir_top = "F:/shared_data_original/top/*.jpg";
-	//string imgdir_top = "F:\\shared_data_original\\\top\pic2/*.jpg";
+	//string imgdir_top = "F:\\shared_data_original\\top\\pic2/*.jpg";
 	//string imgdir_side = "F:\\shared_data_original\\top\\pic2/*.jpg";
 	//string imgdir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_obj_datasets_2/*.jpg";
 	CommonFunc::getAllFilesNameInDir(imgdir_side, imgpathvec_side, true, true);
@@ -337,12 +339,9 @@ int server()
 			cout << "解析完毕！" << endl<<endl;
 
 
-
-
-
 			//printf("收到%d个字节\n", sig);
 			//printf("%s\n", recvBuf);
-			Sleep(500);
+			Sleep(1000);
 		}
 
 		//关闭连接
@@ -361,10 +360,13 @@ void ProcessOneRMes(MPFCommuication *pcomm,BYTE mbMesPos)
 	BYTE bType;
 	int nowpos = 0;
 	BYTE *p_c;
-	BYTE imageid[8] = { 0 };
+	BYTE imageid[6] = { 0 };
 	BYTE barcode[16] = { 0 };
 	int postcode_length;
 	int barcode_length;
+	int i;
+	unsigned int v = 0;
+	unsigned int taskid = 0;
 	try
 	{
 		p = pcomm->m_uchsRevMes[mbMesPos];
@@ -378,7 +380,13 @@ void ProcessOneRMes(MPFCommuication *pcomm,BYTE mbMesPos)
 
 			memcpy(imageid, p_c, 6);
 			nowpos += 6; p_c = p + nowpos;
-			std::cout << "ImageID:" << imageid << endl;
+			for (i=0;i<6;i++)
+			{
+				v = imageid[i];
+				v *= pow(256, 5 - i);
+				taskid += v;
+			}
+			std::cout << "ImageID:" << to_string(taskid) << endl;
 			
 			//ocr_id
 			std::cout << "OCRID:" << unsigned int(*p_c) << endl;

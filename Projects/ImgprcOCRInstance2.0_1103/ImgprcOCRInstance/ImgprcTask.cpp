@@ -168,50 +168,30 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 	OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string>&detected_postcodes)
  {
 	//日志头信息
-	string taskid;
-	taskid.append((char*)(this->m_TaskID), 6);
-	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]Standard tag:";
-
+	std::string informor = string("ImageID[") + ImageID_str() + ":" + to_string(this->m_index_sub_image).c_str() + "] Standard tag: ";
 
 	clock_t end_t, mtime;
 	char logprint[128];
-	//pLogger->TraceInfo("处理一个新的任务！");
-	//std::string localimgpath = std::string(this->m_chsLocalImgPath);
-	if (localimgpath.empty())
+
+	mtime = clock();
+	cv::Mat src_img;
+	if (pSrcMat!=NULL)
 	{
-		pLogger->TraceWarning((informor + "Image path is empty!").c_str());
-		this->m_postcodeNum = 0;
+		src_img = pSrcMat->clone();
+	}
+	else
+	{
+		pLogger->TraceWarning((informor + "Mat is empty!").c_str());
 		return 0;
 	}
-	//pLogger->TraceInfo(localimgpath.c_str());
-	mtime = clock();
-	cv::Mat src_img = cv::imread(localimgpath);
+	
 	if (src_img.empty())
 	{
-		string _logstr = informor + "Image is empty! Imagepath:" + localimgpath;
+		string _logstr = informor + "No parcel! Imagepath:" + localimgpath;
 		pLogger->TraceWarning(_logstr.c_str());
 		this->m_postcodeNum = 0;
 		return 0;
 	}
-
-	CutParcelBox cutparcel;
-	if (isTopView)//针对顶视图 和侧视图 分别做处理
-	{
-		int isparcel = cutparcel.getMailBox_Mat(src_img, src_img,0);
-		if (isparcel == 0) {
-			pLogger->TraceInfo((informor+"No parcel").c_str());
-			return 0;
-		}
-	}
-	else
-	{
-		int isparcel = cutparcel.getMailBox_side(src_img, src_img);
-		if (isparcel == 0) {
-			pLogger->TraceInfo((informor + "No parcel").c_str());
-			return 0;
-		}
-	}
-
 
 	std::vector<cv::Rect> detected_boxes;
 	std::vector<int> detected_classes;
@@ -318,9 +298,7 @@ int ImgprcTask::GetPostcode_v2(const std::string &localimgpath, bool isTopView,
 int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 {
 	//日志设置
-	string taskid;
-	taskid.append((char*)(this->m_TaskID), 6);
-	string process_type;
+	std::string process_type;
 	if (this->m_processType == 0)
 	{
 		process_type = "Standard tag";
@@ -333,78 +311,76 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 	{
 		process_type = "Arbitrary tag";
 	}
-	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]"+ process_type+":";
+	std::string informor = std::string("ImageID[") + ImageID_str() + ":" + to_string(this->m_index_sub_image).c_str() + "] "+ process_type+": ";
 
-
+	int res = PreloadImage2Mat(pLogger);
+	if (res==0)
+	{
+		this->m_resultState = ST_TASK_RESULT_NO_IMAGE;
+		return 0;
+	}
 	//获取图片路径
-	std::vector<std::string> image_pathes;
-	int img_num = splitStrByChar(';', this->m_chsLocalImgPath, image_pathes);
+	//std::vector<std::string> image_pathes;
+	//int img_num = splitStrByChar(';', this->m_chsLocalImgPath, image_pathes);
 	char loginfo[512] = { 0 };
 
-	if (img_num != this->m_image_num)
-	{
-		sprintf_s(loginfo, "Image number from the task is not equal to it from path! task:%d, path:d", this->m_image_num, img_num);
-		this->m_image_num = img_num;
-		pLogger->TraceWarning(loginfo);
-	}
+	//if (img_num != this->m_image_num)
+	//{
+	//	sprintf_s(loginfo, "Image number from the task is not equal to it from path! task:%d, path:d", this->m_image_num, img_num);
+	//	this->m_image_num = img_num;
+	//	pLogger->TraceWarning(loginfo);
+	//}
 
 	int post_index_image = 0; //邮编所在图像索引
 	clock_t end_t, mtime;
 
 	//对每张图片运行算法(目前仅有一张图片)
 	mtime = clock();
-	for (int i=0;i< this->m_image_num;i++)
+
+	std::vector<std::string> post_code_vec;
+	int post_num = 0;
+	bool isTopView = (this->m_isTopViewImage == 1) ? true : false;
+	switch (this->m_processType)//处理类型
 	{
-		std::vector<std::string> post_code_vec;
-		int post_num = 0;
-		bool isTopView = (this->m_isTopViewImage == 1 && i == 0) ? true : false;
-		switch (this->m_processType)//处理类型
-		{
-		case ST_TASK_PROC_TAG:
-			post_num = GetPostcode_v2(image_pathes[i], isTopView, pOcrConifg, pLogger, post_code_vec);
-			break;
-		case ST_TASK_PROC_HWBOX:
-			post_num = GetPostcodeFromHandwrite(image_pathes[i], isTopView, pOcrConifg, pLogger, post_code_vec);
-			break;
-		case ST_TASK_PROC_UNKNOWN_TAG:
-			post_num = GetPostcodeFromArbitTag(image_pathes[i], isTopView, pOcrConifg, pLogger, post_code_vec);
-			break;
-		default:
-			break;
-		}
-		for (int j=0;j< post_num;j++)
-		{
-			if (this->m_postcodeNum!=0)
-			{
-				strcat(this->m_chsOcrPostcode, ";");
-			}
-			post_index_image = i+1;
-			strcat(this->m_chsOcrPostcode, post_code_vec[j].c_str());
-			
-		}
-		this->m_postcodeNum += post_num;
+	case ST_TASK_PROC_TAG:
+		post_num = GetPostcode_v2("", isTopView, pOcrConifg, pLogger, post_code_vec);
+		break;
+	case ST_TASK_PROC_HWBOX:
+		post_num = GetPostcodeFromHandwrite("", isTopView, pOcrConifg, pLogger, post_code_vec);
+		break;
+	case ST_TASK_PROC_UNKNOWN_TAG:
+		post_num = GetPostcodeFromArbitTag("", isTopView, pOcrConifg, pLogger, post_code_vec);
+		break;
+	default:
+		break;
 	}
-	this->m_PostcodeIndextImage = post_index_image; //最后一个
+	for (int j=0;j< post_num;j++)
+	{
+		if (this->m_postcodeNum !=0)
+		{
+			strcat(this->m_chsOcrPostcode, ";");
+		}
+		//post_index_image = i+1;
+		strcat(this->m_chsOcrPostcode, post_code_vec[j].c_str());
+		this->m_postcodeNum++;
+	}
+	//}
+	this->m_PostcodeIndextImage = m_index_sub_image; //最后一个
 
 	if (this->m_postcodeNum == 0) //识别到0个邮编
 	{
-		this->m_resultState = 12;
+		this->m_resultState = ST_TASK_RESULT_NO_POSTCODE;
 	}
 	else if(this->m_postcodeNum == 1) //正确识别到1个邮编
 	{
-		this->m_resultState = 1;
+		this->m_resultState = ST_TASK_RESULT_OK;
 	}
 	else if (this->m_postcodeNum > 1)
 	{
-		this->m_resultState = 13;//多个邮编
+		this->m_resultState = ST_TASK_RESULT_MUL_POSTCODE;//多个邮编
 	}
-	end_t = clock();
-	double timeconsume = (double)(end_t - mtime) / CLOCKS_PER_SEC;
-	sprintf_s(loginfo, "Time consume:%.4fs", timeconsume);
-
 	if (this->m_postcodeNum != 0) //识别到邮编
 	{
-		pLogger->TraceInfo((informor + loginfo).c_str());
 		std::string logstr = informor + "OCR results:";
 		logstr = logstr + this->m_chsOcrPostcode;
 		pLogger->TraceInfo(logstr.c_str());
@@ -413,7 +389,10 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 	{
 		pLogger->TraceInfo((informor + "Find no postcode!").c_str());
 	}
-
+	end_t = clock();
+	double timeconsume = (double)(end_t - mtime) / CLOCKS_PER_SEC;
+	sprintf_s(loginfo, "Time consume:%.4fs", timeconsume);
+	pLogger->TraceInfo((informor + loginfo).c_str());
 	return this->m_postcodeNum;
 }
 
@@ -514,44 +493,34 @@ int ImgprcTask::DeleteLocalCacheFile(Logger *pLogger)
 
 int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool isTopView, OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes)
 {
-	string taskid;
-	taskid.append((char*)(this->m_TaskID), 6);
-	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]Handwrite box:";
+	std::string informor = std::string("ImageID[") + ImageID_str() + ":" + to_string(this->m_index_sub_image).c_str() + "]Handwrite box:";
 	HWDigitsOCR hw_digits_ocr;
-	cv::Mat srcMat = cv::imread(localimgpath);
-	if (srcMat.empty())
-	{
-		pLogger->TraceWarning((informor+"Image file is empty").c_str());
-		return 0;
-	}
-	cv::Mat parcelMat;
-	CutParcelBox cutparcel;
-	if (isTopView)//针对顶视图 和侧视图 分别做处理
-	{
-		int isparcel = 0;
-		try
-		{
-			hw_digits_ocr.getTrayMat(srcMat, parcelMat);
-			isparcel = cutparcel.getMailBox_Mat(parcelMat, parcelMat);
-		}
-		catch (...)
-		{
-			pLogger->TraceWarning((informor + "Find Parcel Box exception!").c_str());
-		}
 
-		if (isparcel == 0) {
-			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
-			return 0;
-		}
+
+	if (m_isTopViewImage == 0)
+	{
+		pLogger->TraceInfo((informor + "ignore!").c_str());
+		return 0;//侧视图不进行任意标记按检测
+	}
+
+
+	cv::Mat srcMat;
+	if (pSrcMat != NULL)
+	{
+		srcMat = pSrcMat->clone();
 	}
 	else
 	{
-		int isparcel = cutparcel.getMailBox_side(srcMat, parcelMat);
-		if (isparcel == 0) {
-			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
-			return 0;
-		}
+		pLogger->TraceWarning((informor + "Mat is empty!").c_str());
+		return 0;
 	}
+	//cv::Mat srcMat = cv::imread(localimgpath);
+	if (srcMat.empty())
+	{
+		pLogger->TraceWarning((informor+"There is no parcel!").c_str());
+		return 0;
+	}
+
 	
 	
 	std::string post_code_str;
@@ -561,11 +530,11 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 	{
 		if (pOcrConifg->is_test_model)
 		{
-			res = hw_digits_ocr.getPostCode2String_test(parcelMat, post_code_str, pOcrConifg);
+			res = hw_digits_ocr.getPostCode2String_test(srcMat, post_code_str, pOcrConifg);
 		}
 		else
 		{
-			res = hw_digits_ocr.getPostCode2String(parcelMat, post_code_str, pOcrConifg);
+			res = hw_digits_ocr.getPostCode2String(srcMat, post_code_str, pOcrConifg);
 		}
 		
 	}
@@ -598,44 +567,69 @@ int ImgprcTask::GetPostcodeFromHandwrite(const std::string &localimgpath, bool i
 int ImgprcTask::GetPostcodeFromArbitTag(const std::string &localimgpath, bool isTopView, OcrAlgorithm_config *pOcrConifg, Logger *pLogger, std::vector<std::string> &detected_postcodes)
 {
 
-	string taskid;
-	taskid.append((char*)(this->m_TaskID), 6);
-	std::string informor = string("ImageID[") + taskid + ":" + to_string(this->m_index_sub_image) + "]Arbitrary tag:";
-	HWDigitsOCR hw_digits_ocr;
-	cv::Mat srcMat = cv::imread(localimgpath);
-	if (srcMat.empty())
+	std::string informor = std::string("ImageID[") + ImageID_str() + ":" + to_string(this->m_index_sub_image).c_str() + "]Arbitrary tag:";
+	
+	if (m_isTopViewImage == 0)
 	{
-		pLogger->TraceWarning((informor + "Image file is empty").c_str());
-		return 0;
+		pLogger->TraceInfo((informor + "ignore!").c_str());
+		return 0;//侧视图不进行手写检测
 	}
-	cv::Mat parcelMat;
-	CutParcelBox cutparcel;
-	if (isTopView)//针对顶视图 和侧视图 分别做处理
-	{
-		int isparcel = 0;
-		try
-		{
-			hw_digits_ocr.getTrayMat(srcMat, parcelMat);
-			isparcel = cutparcel.getMailBox_Mat(parcelMat, parcelMat);
-		}
-		catch (...)
-		{
-			pLogger->TraceWarning((informor + "Find Parcel Box exception!").c_str());
-		}
 
-		if (isparcel == 0) {
-			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
-			return 0;
-		}
+	cv::Mat srcMat;
+	if (pSrcMat != NULL)
+	{
+		srcMat = pSrcMat->clone();
 	}
 	else
 	{
-		int isparcel = cutparcel.getMailBox_side(srcMat, parcelMat);
-		if (isparcel == 0) {
-			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
-			return 0;
-		}
+		pLogger->TraceWarning((informor + "Mat is empty!").c_str());
+		return 0;
 	}
+	//cv::Mat srcMat = cv::imread(localimgpath);
+	if (srcMat.empty())
+	{
+		pLogger->TraceWarning((informor + "There is no parcel!").c_str());
+		return 0;
+	}
+	
+	//
+	//
+	//HWDigitsOCR hw_digits_ocr;
+	//cv::Mat srcMat = cv::imread(localimgpath);
+	//if (srcMat.empty())
+	//{
+	//	pLogger->TraceWarning((informor + "Image file is empty").c_str());
+	//	return 0;
+	//}
+	//cv::Mat parcelMat;
+	//CutParcelBox cutparcel;
+	//if (isTopView)//针对顶视图 和侧视图 分别做处理
+	//{
+	//	int isparcel = 0;
+	//	try
+	//	{
+	//		hw_digits_ocr.getTrayMat(srcMat, parcelMat);
+	//		isparcel = cutparcel.getMailBox_Mat(parcelMat, parcelMat);
+	//	}
+	//	catch (...)
+	//	{
+	//		pLogger->TraceWarning((informor + "Find Parcel Box exception!").c_str());
+	//	}
+
+	//	if (isparcel == 0) {
+	//		pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
+	//		return 0;
+	//	}
+	//}
+	//else
+	//{
+	//	return 0;//不对侧面进行任意标签识别。
+	//	int isparcel = cutparcel.getMailBox_side(srcMat, parcelMat);
+	//	if (isparcel == 0) {
+	//		pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
+	//		return 0;
+	//	}
+	//}
 
 	ArbitTagOCR arbtagocr;
 	std::string post_code_str;
@@ -643,7 +637,7 @@ int ImgprcTask::GetPostcodeFromArbitTag(const std::string &localimgpath, bool is
 	int  res = 0;
 	try
 	{
-		res = arbtagocr.getPostCodeString(parcelMat, post_code_str, pOcrConifg);
+		res = arbtagocr.getPostCodeString(srcMat, post_code_str, pOcrConifg);
 
 	}
 	catch (...)
@@ -696,6 +690,86 @@ BYTE ImgprcTask::GetNextProcessType(OcrAlgorithm_config *pOcrConifg)
 
 	return ST_TASK_PROC_OVER;
 
+}
+
+int ImgprcTask::PreloadImage2Mat(Logger *pLogger)
+{
+	std::string informor = string("ImageID[") + ImageID_str() + ":" + to_string(this->m_index_sub_image).c_str() + "]:";
+	if (pSrcMat!=NULL)
+	{
+		return 1;
+	}
+	std::vector<std::string> image_pathes;
+	int img_num = splitStrByChar(';', this->m_chsLocalImgPath, image_pathes);
+	if (img_num == 0)
+	{
+		pLogger->TraceWarning((informor + "Image path is empty!").c_str());
+	}
+	cv::Mat srcm = cv::imread(image_pathes[0]);
+	if (srcm.empty())
+	{
+		pLogger->TraceWarning((informor + "Image loaded is empty! Image path: "+ image_pathes[0]).c_str());
+		return 0;
+	}
+
+	pSrcMat = new Mat();
+	Mat parcelMat;
+	CutParcelBox cutparcel;
+	if (m_isTopViewImage ==1 )//针对顶视图 和侧视图 分别做处理
+	{
+		HWDigitsOCR hw_digits_ocr;
+		int isparcel = 0;
+		try
+		{
+			hw_digits_ocr.getTrayMat(srcm, parcelMat);
+			isparcel = cutparcel.getMailBox_Mat(parcelMat, parcelMat);
+		}
+		catch (...)
+		{
+			pLogger->TraceWarning((informor + "Find Parcel Box exception!").c_str());
+		}
+
+		if (isparcel == 0) {
+			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
+			return 1;
+		}
+	}
+	else
+	{
+		int isparcel = cutparcel.getMailBox_side(srcm, parcelMat);
+		if (isparcel == 0) {
+			pLogger->TraceInfo((informor + "Find no parcel in image").c_str());
+			return 1;
+		}
+	}
+
+	parcelMat.copyTo(*pSrcMat);
+
+	return 1;
+
+}
+
+int ImgprcTask::ReleaseMat()
+{
+	if (pSrcMat==NULL)
+	{
+		return 1;
+	}
+	pSrcMat->release();
+	delete pSrcMat;
+	return 1;
+}
+
+std::string ImgprcTask::ImageID_str()
+{
+	unsigned int taskid=0;
+	for (int i=0;i<6;i++)
+	{
+		unsigned int v = this->m_TaskID[i];
+		v *= pow(256, 5-i);
+		taskid += v;
+	}
+	return to_string(taskid);
 }
 
 int ImgprcTask::splitStrByChar(char sC, const char * srcString, std::vector<std::string> &rStrVec)

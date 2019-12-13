@@ -25,7 +25,7 @@ public:
 	// 参数: bool isReturnPath : 返回文件名中是否包括文件路径，默认不包括
 	//************************************
 	static int getAllFilesNameInDir(std::string dir, std::vector<std::string> &filenames,bool isIncludeSubDir=false, bool isReturnPath=false);
-	
+	static int getAllSubDirsInDir(std::string dir, std::vector<std::string> &subdirs, bool isIncludeSubDir = false, bool isReturnPath = false);
 	
 	//************************************
 	// 函数:    get_exe_dir		
@@ -56,6 +56,7 @@ public:
 	// 参数: std::string & dstFullPath			#输出全路径
 	//************************************
 	static int joinFilePath(std::string path1, std::string path2, std::string &dstFullPath);
+	static std::string joinFilePath(std::string path1, std::string path2);
 
 	//************************************
 	// 函数:    getExtensionFilename		
@@ -65,5 +66,17 @@ public:
 	// 参数: std::string srcPath			#
 	// 参数: std::string & dstExName			#
 	//************************************
-	static int getExtensionFilename(std::string srcPath, std::string &dstExName);
+	static std::string getExtensionFilename(std::string srcPath);
+
+	static std::string getShortFilename(std::string srcPath);
+
+	//************************************
+	// 函数:    WCharToChar		
+	// 作用：将宽字节字符转为多字节字符,支持最大字符长度4096,返回需要使用string（CString）接收。
+	// 全名:  CommonFunc::WCharToChar		
+	// 返回值:   const char*		#
+	// 参数: const wchar_t * srcWChar			#
+	//************************************
+	static const char* WCharToMChar(const wchar_t* srcWChar);
+	static const wchar_t* MCharToWChar(const char* srcChar);
 };

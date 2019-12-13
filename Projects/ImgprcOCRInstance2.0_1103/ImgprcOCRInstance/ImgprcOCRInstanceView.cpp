@@ -8,7 +8,7 @@
 #include "ImgprcOCRInstanceView.h"
 #include "HWDigitsRecogDll.h"
 #include "MPFCommuication.h"
-
+#include "CommonFunc.h"
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -656,9 +656,16 @@ void CALLBACK TimeFunctionImg(PVOID lpParam, BOOLEAN TimerOrWaitFired)
 		{
 			proc_type = _T("U");
 		}
+		DWORD time_end = GetTickCount();
+		DWORD time_ = time_end - mTask.m_dwTimeTrigger;
+		
+		string taskid = "ImageID[" + mTask.ImageID_str() + "]: Whole time consume: " + to_string(time_ / 1000.00) + "s";
+		plogger->TraceInfo(taskid.c_str());
+
+
 		USES_CONVERSION;
 		info_str.Format(_T("%s(%d)"), A2T(mTask.m_chsOcrPostcode),mTask.m_postcodeNum);
-		info_str = proc_type + _T(":") + info_str;
+		info_str = CString(_T("[ID")) + A2T(mTask.ImageID_str().c_str()) +_T("]") + proc_type + _T(":") + info_str;
 		pView->ToDisplay(1, info_str);
 		int a = pView->DelAnImageProcessTask(mTask);
 		//sprintf((char*)pBuffer, "删除了%d个任务", a);
@@ -1021,6 +1028,7 @@ void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 	OnAnImageProcessTaskOver(mtask); //处理完一个任务
 	if (mtask.m_image_total_num == 1)
 	{
+		mtask.ReleaseMat();
 		if (isCacheImageFile)
 		{
 			mtask.DeleteLocalCacheFile(plogger);
@@ -1046,14 +1054,13 @@ void CImgprcOCRInstanceView::ImagesProcessing(OcrAlgorithm_config* pConfig)
 			//mtask.m_processType = ST_TASK_PROC_OVER;
 			mtask.m_isProcessing = ST_TASK_PROCESSED;
 			PushAnImageProcessTask(mtask);//推入打包后的已完成任务
-			if (isCacheImageFile)
-			{
-				for (int i = 0; i < waitPackageTasks.size(); i++)
-				{
-					waitPackageTasks[i].DeleteLocalCacheFile(plogger);
-				}
-			}
 
+			for (int i = 0; i < waitPackageTasks.size(); i++)
+			{
+				waitPackageTasks[i].ReleaseMat();
+				if (isCacheImageFile)
+					waitPackageTasks[i].DeleteLocalCacheFile(plogger);
+			}
 		}
 	}
 
@@ -1331,11 +1338,11 @@ int CImgprcOCRInstanceView::SplitTask(ImgprcTask &mTask, std::vector<ImgprcTask>
 		strcpy(subTask.m_chsFileName, substrs[i].c_str());
 		if (i == 0)
 		{
-			subTask.m_isTopViewImage = true;
+			subTask.m_isTopViewImage = 1;
 		}
 		else
 		{
-			subTask.m_isTopViewImage = false;
+			subTask.m_isTopViewImage = 0;
 		}
 		subTask.m_index_sub_image = i;
 		subTask.m_image_num = 1;//子任务的图片数量默认为1
@@ -1350,9 +1357,13 @@ int CImgprcOCRInstanceView::MergeHomoTasks(std::vector<ImgprcTask> &subTasks, Im
 {
 	if (subTasks.size() == 0) return 0;
 	mTask = subTasks[0];
-
+	int no_image_num = 0;
 	for (int i = 1;i<subTasks.size();i++)
 	{
+		if (subTasks[i].m_resultState == ST_TASK_RESULT_NO_IMAGE)
+		{
+			no_image_num++;
+		}
 		if (subTasks[i].m_postcodeNum>=1)
 		{
 			if (mTask.m_postcodeNum!=0)
@@ -1365,17 +1376,22 @@ int CImgprcOCRInstanceView::MergeHomoTasks(std::vector<ImgprcTask> &subTasks, Im
 			mTask.m_postcodeNum += subTasks[i].m_postcodeNum;
 		}
 	}
-	if (mTask.m_postcodeNum == 0) //识别到0个邮编
+
+	if (mTask.m_postcodeNum == 1) //正确识别到1个邮编
 	{
-		mTask.m_resultState = 12;
-	}
-	else if (mTask.m_postcodeNum == 1) //正确识别到1个邮编
-	{
-		mTask.m_resultState = 1;
+		mTask.m_resultState = ST_TASK_RESULT_OK;
 	}
 	else if (mTask.m_postcodeNum > 1)
 	{
-		mTask.m_resultState = 13;//多个邮编
+		mTask.m_resultState = ST_TASK_RESULT_MUL_POSTCODE;//多个邮编
+	}
+	else if(no_image_num > 0)
+	{
+		mTask.m_resultState = ST_TASK_RESULT_NO_IMAGE;
+	}
+	else if(mTask.m_postcodeNum == 0)
+	{
+		mTask.m_resultState = ST_TASK_RESULT_NO_POSTCODE;
 	}
 
 	mTask.m_isProcessing = ST_TASK_PROCESSED;

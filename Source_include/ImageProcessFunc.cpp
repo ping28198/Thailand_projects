@@ -7,10 +7,7 @@ int ImageProcessFunc::adJustBrightness(cv::Mat& src, double alpha, double beta, 
 {
 	int height = src.rows;
 	int width = src.cols;
-	if (src.channels() != 1)
-	{
-		return 0;
-	}
+	assert(src.channels() == 1);
 	for (int row = 0; row < height; row++) {
 		for (int col = 0; col < width; col++) {
 			float v = src.at<uchar>(row, col);
@@ -45,7 +42,7 @@ void ImageProcessFunc::rotate_arbitrarily_angle(cv::Mat &src, cv::Mat &dst, floa
 	using namespace cv;
 	float radian = angle;//(float)(angle / 180.0 * CV_PI);     //填充图像
 	float angle_dec = angle / CV_PI * 180;
-	int maxBorder = (int)(max(src.cols, src.rows)* 1.414); //即为sqrt(2)*max   
+	int maxBorder = (int)(max(src.cols, src.rows)* 1.42); //即为sqrt(2)*max   
 	int dx = (maxBorder - src.cols) / 2;
 	int dy = (maxBorder - src.rows) / 2;
 	copyMakeBorder(src, dst, dy, dy, dx, dx, BORDER_CONSTANT, Scalar(0, 0, 0));     //旋转    
@@ -59,15 +56,7 @@ void ImageProcessFunc::rotate_arbitrarily_angle(cv::Mat &src, cv::Mat &dst, floa
 	int x = (dst.cols - targetSize.width) / 2.0;
 	int y = (dst.rows - targetSize.height) / 2.0;
 	Rect rect(x, y, targetSize.width, targetSize.height);
-	if (rect.x + rect.width > dst.cols)
-	{
-		rect.width = dst.cols - rect.x;
-	}
-	if (rect.y + rect.height > dst.rows)
-	{
-		rect.height = dst.rows - rect.y;
-	}
-
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, dst.cols, dst.rows), rect);
 	dst = Mat(dst, rect);
 }
 
@@ -107,17 +96,7 @@ int ImageProcessFunc::sumPixels(cv::Mat &srcimg, int axis, std::vector<unsigned 
 double ImageProcessFunc::getAveragePixelInRect(cv::Mat& src, cv::Rect &mRect)
 {
 	cv::Mat tmat = src(mRect);
-	int w = tmat.cols;
-	int h = tmat.rows;
-	int tatalpix = 0;
-	for (int i = 0; i < w; i++)
-	{
-		for (int j = 0; j < h; j++)
-		{
-			tatalpix = tatalpix + tmat.at<uchar>(j, i);
-		}
-	}
-	return double(tatalpix) / (w*h);
+	return getAverageBrightness(tmat);
 }
 
 double ImageProcessFunc::getAverageBrightness(cv::Mat src)
@@ -125,17 +104,29 @@ double ImageProcessFunc::getAverageBrightness(cv::Mat src)
 	int height = src.rows;
 	int width = src.cols;
 	double b = 0;
-	if (src.channels() != 1)
+	if (src.channels()==1)
 	{
-		return 0;
-	}
-	for (int row = 0; row < height; row++) {
-		for (int col = 0; col < width; col++) {
-			float v = src.at<uchar>(row, col);
-			b += v;
+		for (int row = 0; row < height; row++) {
+			for (int col = 0; col < width; col++)
+			{
+				b += src.at<uchar>(row, col);
+			}
 		}
 	}
-	b = b / (height*width);
+	else if(src.channels()==3)
+	{
+		for (int row = 0; row < height; row++) {
+			for (int col = 0; col < width; col++)
+			{
+				for (int c=0;c<3;c++)
+				{
+					b += src.at<cv::Vec3b>(row, col)[c];
+				}
+			}
+		}
+	}
+
+	b = b / (height*width*src.channels());
 	return b;
 }
 
@@ -160,9 +151,6 @@ int ImageProcessFunc::getContourRect(std::vector<cv::Point2f> & points_vec, cv::
 	mRect.height = h;
 
 	return 1;
-
-
-
 }
 
 int ImageProcessFunc::getContourRect(std::vector<cv::Point> & points_vec, cv::Rect &mRect)
@@ -237,13 +225,15 @@ bool ImageProcessFunc::IsPointInRect(cv::Point pt, cv::Rect rc)
 	return false;
 }
 
-int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc)
+int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc, unsigned char border_value/* = 255*/)
 {
 	
 	cv::Rect boxRec = rRc.boundingRect();
 	//cv::Rect boxRec_n(0, 0, boxRec.width, boxRec.height);
 
-	cv::Mat padMat = cv::Mat::zeros(boxRec.size(), src_mat.type());
+	//cv::Mat padMat = cv::Mat::zeros(boxRec.size(), src_mat.type());
+	cv::Mat padMat = cv::Mat(boxRec.size(), src_mat.type(), cv::Scalar(border_value));
+
 	cv::Rect cropRect = boxRec;
 	int res = CropRect(cv::Rect(0, 0, src_mat.cols, src_mat.rows), cropRect);
 	if (!res) return 0;
@@ -252,7 +242,7 @@ int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst
 	boxMat.copyTo(padMat(copyRect));
 	int max_lenth = std::max(padMat.cols, padMat.rows);
 
-	cv::Mat padMat_e = cv::Mat::zeros(cv::Size(max_lenth, max_lenth), src_mat.type());
+	cv::Mat padMat_e = cv::Mat(cv::Size(max_lenth, max_lenth), src_mat.type(), cv::Scalar(border_value));
 	cv::Rect rec_e;
 	rec_e.x = (padMat.cols > padMat.rows) ? 0 : (padMat.rows - padMat.cols) / 2;
 	rec_e.y = (padMat.cols > padMat.rows) ? (padMat.cols - padMat.rows) / 2 : 0;
@@ -277,3 +267,61 @@ int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst
 	
 }
 
+int ImageProcessFunc::rotatePoints(std::vector<cv::Point2f> & points_vec, double angle, cv::Point2f center_point)
+{
+	//移动到原点
+	if (center_point != cv::Point2f(0,0))
+	{
+		for (int i=0;i<points_vec.size();i++)
+		{
+			points_vec[i] = points_vec[i] - center_point;
+		}
+	}
+	double sin_x = sin(angle);
+	double cos_x = cos(angle);
+	cv::Mat r_mat = (cv::Mat_<float>(2, 2) << cos_x, -sin_x, sin_x, cos_x);
+	cv::Mat points_mat = cv::Mat(2, points_vec.size(), CV_32FC1);
+	for (int i = 0; i < points_vec.size(); i++)
+	{
+		points_mat.at<float>(0, i) = points_vec[i].x;
+		points_mat.at<float>(1, i) = points_vec[i].y;
+	}
+	cv::Mat times_resut_m;
+	times_resut_m = r_mat * points_mat;
+	for (int i = 0; i < points_vec.size(); i++)
+	{
+		points_vec[i].x = times_resut_m.at<float>(0, i);
+		points_vec[i].y = times_resut_m.at<float>(1, i);
+	}
+
+	//平移回原来的位置
+	if (center_point != cv::Point2f(0, 0))
+	{
+		for (int i = 0; i < points_vec.size(); i++)
+		{
+			points_vec[i] = points_vec[i] + center_point;
+		}
+	}
+
+
+	return 0;
+}
+
+int ImageProcessFunc::rotatePoints(std::vector<cv::Point> & points_vec, double angle, cv::Point center_point)
+{
+	std::vector<cv::Point2f> points_vecf;
+	cv::Point2f pt;
+	for (int i = 0; i < points_vec.size(); i++)
+	{
+		pt.x = points_vec[i].x;
+		pt.y = points_vec[i].y;
+		points_vecf.push_back(pt);
+	}
+	rotatePoints(points_vecf, angle,center_point);
+	for (int i = 0; i < points_vec.size(); i++)
+	{
+		points_vec[i].x = round(points_vecf[i].x);
+		points_vec[i].y = round(points_vecf[i].y);
+	}
+	return 1;
+}
