@@ -54,9 +54,9 @@ int main()
 
 	//cout << "误差：" << e << endl;
 
-	Mat m = imread("F:\\CommonDatasets\\ILSVRC2017Download\\tiny-imagenet-200\\test\\images\\test_0.JPEG");
-	cout << ImageProcessFunc::getAverageBrightness(m) << endl;
-
+	//Mat m = imread("F:\\CommonDatasets\\ILSVRC2017Download\\tiny-imagenet-200\\test\\images\\test_0.JPEG");
+	//cout << ImageProcessFunc::getAverageBrightness(m) << endl;
+	testCutParcelBox();
 
 	//cout << a << endl;
 	//QueryPerformanceCounter(&tima);
@@ -131,6 +131,12 @@ int main()
 	//testROI();
 	return 1;
 }
+
+
+
+
+
+
 int testTimeConsume()
 {
 	uniform_int_distribution<unsigned> u(0, 1000);
@@ -705,11 +711,11 @@ int getWaveletCoef(cv::Mat srcMat, cv::Mat &dstMat,double threshold, int coef_di
 int testCutParcelBox()
 {
 	//CutMailBox cutMailBox;
-	string dir = "F:/shared_data_original/top/*.jpg";
+	string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\20191204/*.jpg";
+	string out_dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\20191204/parcelimage/";
 	//string dir = "F:/cpte_datasets/Tailand_tag_detection_datasets/Image[2019-8-2]/*.jpg";
 	vector<string> imgfiles;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, true, true);
-	time_t t1, t2;
 	for (int i = 0; i < imgfiles.size(); i++)
 	{
 		//res = OcrAlgorithm::getParcelBoxFromSick(imgfiles[i], r);
@@ -720,7 +726,7 @@ int testCutParcelBox()
 		//}
 		//if(i<40) continue;
 
-		cout << "图片:" << i << endl;
+		cout << "图片:" << i <<"/"<<imgfiles.size()<< endl;
 		std::string imgfile = imgfiles[i];
 		//imgfile = imgfile.replace(imgfile.length() - 3, 3, "jpg");
 		cv::Mat srcmat;
@@ -731,32 +737,41 @@ int testCutParcelBox()
 			cout << "图像为空" << endl;
 			continue;
 		}
-		cv::Mat show_src;
-		cv::resize(srcmat, show_src, Size(), 0.15, 0.15);
-		imshow("src", show_src);
-		clock_t start_t = clock();
+		//cv::Mat show_src;
+		//cv::resize(srcmat, show_src, Size(), 0.15, 0.15);
+		//imshow("src", show_src);
+		//clock_t start_t = clock();
 		CutParcelBox cutbox;
 		//CutParcelBoxDll cutbox;
-		cv::Mat resizedMat;
+		cv::Mat parcelMat;
 		//int res = cutbox.getMailBox_Mat(srcmat, resizedMat,0);
 
-		int res = cutbox.getMailBox_Mat(srcmat, resizedMat);
-		clock_t end_t = clock();
+		int res = cutbox.getMailBox_Mat(srcmat, parcelMat,0,1,30);
+		if (parcelMat.empty())
+		{
+			cout << "截取包裹为空" << endl;
+			continue;
+		}
+		string mfilename;
+		CommonFunc::splitDirectoryAndFilename(imgfile, string(), mfilename);
+		string newfilepath = CommonFunc::joinFilePath(out_dir, mfilename);
+		imwrite(newfilepath, parcelMat);
+		/*clock_t end_t = clock();
 		double timeconsume = (double)(end_t - start_t) / CLOCKS_PER_SEC;
 		cout << "time comsume:" << timeconsume << endl;
 		if (res!=0)
 		{
 			cv::resize(resizedMat, resizedMat, Size(), 0.2, 0.2);
 			imshow("res", resizedMat);
-			
-		}
+
+		}*/
 
 		
 
 
 		//imshow("results", resizedMat);
 
-		waitKey(0);
+		//waitKey(0);
 
 	}
 

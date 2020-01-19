@@ -5589,7 +5589,7 @@ int renameBarcodeImage()
 
 	}
 
-
+	return 1;
 }
 
 int ArbitTagOCR::getTag(cv::Mat srcParcelMat, cv::Mat &dstTagMat)
