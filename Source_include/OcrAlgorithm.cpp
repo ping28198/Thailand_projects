@@ -51,10 +51,14 @@ int OcrAlgorithm::runOcr(Mat& RoiMat, char* pResults, size_t bufferlenth, tesser
 	int h = RoiMat.rows;
 	int sh = 30;
 	float scal_ = sh / float(h);
-	cv::Mat resizedMat = RoiMat;
+	cv::Mat resizedMat;
 	if (scal_ > 1.1)
 	{
 		cv::resize(RoiMat, resizedMat, cv::Size(), scal_, scal_,cv::INTER_AREA);
+	}
+	else
+	{
+		resizedMat = RoiMat.clone();
 	}
 
 	cv::Rect mR;
@@ -533,17 +537,16 @@ int OcrAlgorithm::_runOcr(Mat& RoiMat, char* pResults, size_t bufferlenth)
 int OcrAlgorithm::_runOcrPreload(Mat& RoiMat, char* pResults, size_t bufferlenth, tesseract::TessBaseAPI* pTess)
 {
 	if (RoiMat.empty()) return 0;
+	Mat srcm = RoiMat;
 
-
-
-	int w = RoiMat.cols;
-	int h = RoiMat.rows;
-	unsigned char *pImgData = RoiMat.data;
+	int w = srcm.cols;
+	int h = srcm.rows;
+	unsigned char *pImgData = srcm.data;
 
 	pTess->SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_LINE);
 	//pTess->SetVariable("save_best_choices", "T");
-	pTess->SetVariable("classify_bln_numeric_mode", "1");
-	pTess->SetImage(RoiMat.data, w, h, RoiMat.channels(), RoiMat.step1());
+	//pTess->SetVariable("classify_bln_numeric_mode", "1");
+	pTess->SetImage(srcm.data, w, h, srcm.channels(), srcm.step1());
 	pTess->Recognize(0);
 
 	// get result and delete[] returned char* string
@@ -1538,17 +1541,17 @@ int OcrAlgorithm::getPostcodeRoi(Mat &srcImg, std::vector<cv::Rect> &dstRects, R
 	if (start_y < 0) start_y = 0;
 	int end_x = mrect.x + mrect.width + mrect.height;
 	if (end_x > w) end_x = w;
-	Rect searchRech;
-	searchRech.x = start_x;
-	searchRech.y = start_y;
-	searchRech.width = end_x - start_x;
-	searchRech.height = mrect.y - start_y;
+	Rect searchRect;
+	searchRect.x = start_x;
+	searchRect.y = start_y;
+	searchRect.width = end_x - start_x;
+	searchRect.height = mrect.y - start_y;
 	//cv::rectangle(flipedMat, searchRech, Scalar(255, 255, 255), 2);
 	//Mat roiMat = srcImg(searchRech);
 	//Mat sRoiMat = srcImg(searchRech);
 	std::vector<cv::Rect> mRects;
 	cv::Rect roiRect;
-	int res = getPostcodeRoiInRectImg(srcImg, searchRech, roiRect);
+	int res = getPostcodeRoiInRectImg(srcImg, searchRect, roiRect);
 	if (res != 0)
 	{
 		mRects.push_back(roiRect);
@@ -1591,7 +1594,6 @@ int OcrAlgorithm::getPostcodeRoi(Mat &srcImg, std::vector<cv::Rect> &dstRects, R
 		rectangle(showMat, mRects[i], cv::Scalar(0, 0, 0), 3);
 	}
 	imshow("邮编定位候选框", showMat);
-
 
 #endif // POSTCODE_ROI_DEBUG
 
@@ -1886,6 +1888,24 @@ int OcrAlgorithm::getPostcodeRoiInRectImg(cv::Mat srcImg, cv::Rect sRect, cv::Re
 #endif // POSTCODE_ROI_DEBUG
 		return 0;
 	}
+
+	//判断是否出现两行粘连
+	vector<int> bars_pos_y_vec;
+	for (int i=0;i<3;i++)
+	{
+		bars_pos_y_vec.push_back(bars_vec[i].y - bars_vec[i].x);
+		cout << "bars " << i << " pos:" << bars_pos_y_vec[i]<<endl;
+	}
+	std::sort(bars_pos_y_vec.begin(),bars_pos_y_vec.end());
+
+	if (bars_pos_y_vec[2]>=2*bars_pos_y_vec[0])
+	{
+#ifdef POSTCODE_ROI_DEBUG
+		printf("出现行粘连\n");
+#endif // POSTCODE_ROI_DEBUG
+		return 0;
+	}
+
 
 
 	// 确定邮编行区域
@@ -2524,12 +2544,12 @@ double OcrAlgorithm::postcodeStringScore(std::string srcStr,std::string &resultS
 	//是否考虑-被识别为空格的情况。。。待定
 	double score_l_r5 = continuousDigitsScore(srcStr, length_left+ length_right_5);
 	double score_l_r4 = continuousDigitsScore(srcStr, length_left + length_right_4);
-	double score_r5 = continuousDigitsScore(srcStr, length_right_5);
+	double score_r5 = 0;// continuousDigitsScore(srcStr, length_right_5); //只识别到5位的将拒识
 
 	int max_i = 0;
 	if (score_l_r4 > score_l_r5)
 	{
-		if (score_l_r4 > score_r5)
+		if (score_l_r4 >= score_r5)
 		{
 			getFirstContinuousDigits(srcStr, length_left + length_right_4, resultStr);
 			whole_score = score_l_r4;
@@ -2543,7 +2563,7 @@ double OcrAlgorithm::postcodeStringScore(std::string srcStr,std::string &resultS
 	}
 	else
 	{
-		if (score_l_r5 > score_r5)
+		if (score_l_r5 >= score_r5)
 		{
 			getFirstContinuousDigits(srcStr, length_left + length_right_5, resultStr);
 			whole_score = score_l_r5;

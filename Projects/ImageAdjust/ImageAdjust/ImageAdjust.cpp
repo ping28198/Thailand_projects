@@ -56,7 +56,7 @@ int main()
 
 	//Mat m = imread("F:\\CommonDatasets\\ILSVRC2017Download\\tiny-imagenet-200\\test\\images\\test_0.JPEG");
 	//cout << ImageProcessFunc::getAverageBrightness(m) << endl;
-	testCutParcelBox();
+	//testCutParcelBox();
 
 	//cout << a << endl;
 	//QueryPerformanceCounter(&tima);
@@ -81,7 +81,7 @@ int main()
 	//}
 	//cout << endl;
 
-	//testROI();
+	testROI();
 	//testAlignImages();
 	//testRotateTag();
 	//	
@@ -1042,7 +1042,8 @@ int mirrorImg()
 int testROI()
 {
 	//string dir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_cut_img/hard_work\\*.jpg";
-	string dir = "F:\\detected_data\\ng\\*.jpg";
+	//string dir = "F:\\detected_data\\ng\\*.jpg";
+	string dir = "E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\saved_file\\*.jpg";
 	vector<string> imgfiles;
 	clock_t start_t, end_t;
 	CommonFunc::getAllFilesNameInDir(dir, imgfiles, false, true);

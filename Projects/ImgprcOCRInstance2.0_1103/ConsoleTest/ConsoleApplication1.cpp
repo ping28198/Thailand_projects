@@ -145,7 +145,7 @@ int server()
 
 	//初始化服务器地址族变量
 	SOCKADDR_IN addrSrv;
-	addrSrv.sin_addr.S_un.S_addr = inet_addr("192.168.1.30");//htonl(INADDR_ANY);
+	addrSrv.sin_addr.S_un.S_addr = inet_addr("192.168.0.1");//htonl(INADDR_ANY);
 	addrSrv.sin_family = AF_INET;
 	addrSrv.sin_port = htons(9999);
 
@@ -170,8 +170,10 @@ int server()
 	}
 	vector<string> imgpathvec_top;
 	vector<string> imgpathvec_side;
-	string imgdir_side = "F:/shared_data_original/side/*.jpg";
-	string imgdir_top = "F:/shared_data_original/top/*.jpg";
+	//string imgdir_side = "F:/shared_data_original/side/*.jpg";
+	string imgdir_side = "F:/20191227/choose/1121-abnormal/*.jpg";
+	//string imgdir_top = "F:/shared_data_original/top/*.jpg";
+	string imgdir_top = "F:\\shared_data_original\\copy_m/*.jpg";
 	//string imgdir_top = "F:\\shared_data_original\\top\\pic2/*.jpg";
 	//string imgdir_side = "F:\\shared_data_original\\top\\pic2/*.jpg";
 	//string imgdir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_obj_datasets_2/*.jpg";
@@ -195,7 +197,8 @@ int server()
 		return 0;
 	}
 
-	printf("找到图片数量%d\n", imgpathvec_side.size()+ imgpathvec_top.size());
+	printf("找到顶部图片数量%d\n", imgpathvec_top.size());
+	printf("找到侧面图片数量%d\n", imgpathvec_side.size());
 	//等待连接_接收_发送
 
 	MPFCommuication mRecOp;

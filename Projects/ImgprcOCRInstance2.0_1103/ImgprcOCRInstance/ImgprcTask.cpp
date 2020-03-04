@@ -393,6 +393,7 @@ int ImgprcTask::PorcessTask(OcrAlgorithm_config *pOcrConifg, Logger *pLogger)
 	double timeconsume = (double)(end_t - mtime) / CLOCKS_PER_SEC;
 	sprintf_s(loginfo, "Time consume:%.4fs", timeconsume);
 	pLogger->TraceInfo((informor + loginfo).c_str());
+	//waitKey(1);
 	return this->m_postcodeNum;
 }
 
