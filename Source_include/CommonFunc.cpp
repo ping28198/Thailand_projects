@@ -316,8 +316,8 @@ std::string CommonFunc::getExtensionFilename(std::string srcPath)
 std::string CommonFunc::getShortFilename(std::string srcPath)
 {
 	std::string filename;
-	std::string directory;
-	splitDirectoryAndFilename(srcPath, directory, filename);
+	std::string s;
+	splitDirectoryAndFilename(srcPath, s, filename);
 	size_t pos = filename.find_last_of('.');
 	string shortname;
 	if (pos != filename.npos)
@@ -331,19 +331,29 @@ std::string CommonFunc::getShortFilename(std::string srcPath)
 	return shortname;
 }
 
-const char* CommonFunc::WCharToMChar(const wchar_t* srcWChar)
+const char* CommonFunc::WCharToMChar(const wchar_t* srcWChar, char *dstChar)
 {
 	size_t wlength = wcslen(srcWChar);
 	char tmp[4096] = { 0 };
 	WideCharToMultiByte(CP_ACP, 0, srcWChar, wlength, tmp, 4096, NULL, NULL);
+	if (dstChar!=NULL)
+	{
+		strcpy(dstChar, tmp);
+		return NULL;
+	}
 	return tmp;
 }
 
-const wchar_t* CommonFunc::MCharToWChar(const char* srcChar)
+const wchar_t* CommonFunc::MCharToWChar(const char* srcChar,wchar_t *dstWChar)
 {
 	size_t slen = strlen(srcChar);
 	wchar_t wtmp[4096] = { 0 };
 	MultiByteToWideChar(CP_ACP, 0, srcChar, slen, wtmp, 4096);
+	if (dstWChar !=NULL)
+	{
+		wcscpy(dstWChar, wtmp);
+		return NULL;
+	}
 	return wtmp;
 }
 

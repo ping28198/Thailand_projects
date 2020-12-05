@@ -90,7 +90,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>$(SolutionDir)..\..\external_include\tensorflow\external\eigen_archive;$(SolutionDir)..\..\external_include\tensorflow\external\com_google_absl;$(SolutionDir)..\..\external_include\tensorflow\external\protobuf_archive\src;$(SolutionDir)..\..\external_include\tensorflow\external\org_tensorflow;$(SolutionDir)..\..\external_include\tensorflow;$(SolutionDir)..\..\external_include\Tesseract;$(SolutionDir)..\..\external_include\opencv;$(SolutionDir)..\..\external_include\wavelib;$(SolutionDir)..\..\Source_include;$(WindowsSDK_IncludePath);$(VC_IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\..\external_include\tensorflow\external\eigen_archive;$(SolutionDir)..\..\external_include\tensorflow\external\com_google_absl;$(SolutionDir)..\..\external_include\tensorflow\external\protobuf_archive\src;$(SolutionDir)..\..\external_include\tensorflow\external\org_tensorflow;$(SolutionDir)..\..\external_include\tensorflow;$(SolutionDir)..\..\external_include\Tesseract;$(SolutionDir)..\..\external_include\ZXing;$(SolutionDir)..\..\external_include\opencv;$(SolutionDir)..\..\external_include\wavelib;$(SolutionDir)..\..\Source_include;$(WindowsSDK_IncludePath);$(VC_IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)..\..\external_libs\$(Configuration);$(SolutionDir)..\..\Libs;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
     <ExecutablePath>$(TESSERACT_OCR_DIR)\bin;$(ExecutablePath)</ExecutablePath>
   </PropertyGroup>
@@ -165,7 +165,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>libfftw3-3.lib;tag_detect.lib;CutParcelBox.lib;opencv_world343.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;tesseract41.lib;leptonica-1.76.0.lib;HWDigitsRecog.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>libfftw3-3.lib;tag_detect.lib;CutParcelBox.lib;opencv_world343.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;tesseract41.lib;leptonica-1.76.0.lib;HWDigitsRecog.lib;ZXing.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -174,6 +174,7 @@
     <ClInclude Include="..\..\..\Source_include\ImageProcessFunc.h" />
     <ClInclude Include="..\..\..\Source_include\kiss_fft.h" />
     <ClInclude Include="..\..\..\Source_include\OcrAlgorithm.h" />
+    <ClInclude Include="..\..\..\Source_include\phash.hpp" />
     <ClInclude Include="..\..\..\Source_include\tag_detect.h" />
     <ClInclude Include="..\..\..\Source_include\tinyxml2.h" />
     <ClInclude Include="..\..\..\Source_include\wavelet2dcpp.h" />

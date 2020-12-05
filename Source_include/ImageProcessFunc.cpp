@@ -232,7 +232,7 @@ int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst
 	//cv::Rect boxRec_n(0, 0, boxRec.width, boxRec.height);
 
 	//cv::Mat padMat = cv::Mat::zeros(boxRec.size(), src_mat.type());
-	cv::Mat padMat = cv::Mat(boxRec.size(), src_mat.type(), cv::Scalar(border_value));
+	cv::Mat padMat = cv::Mat(boxRec.size(), src_mat.type(), cv::Scalar(border_value, border_value, border_value));
 
 	cv::Rect cropRect = boxRec;
 	int res = CropRect(cv::Rect(0, 0, src_mat.cols, src_mat.rows), cropRect);
@@ -242,7 +242,7 @@ int ImageProcessFunc::getMatFromRotatedRect(const cv::Mat &src_mat, cv::Mat &dst
 	boxMat.copyTo(padMat(copyRect));
 	int max_lenth = std::max(padMat.cols, padMat.rows);
 
-	cv::Mat padMat_e = cv::Mat(cv::Size(max_lenth, max_lenth), src_mat.type(), cv::Scalar(border_value));
+	cv::Mat padMat_e = cv::Mat(cv::Size(max_lenth, max_lenth), src_mat.type(), cv::Scalar(border_value, border_value, border_value));
 	cv::Rect rec_e;
 	rec_e.x = (padMat.cols > padMat.rows) ? 0 : (padMat.rows - padMat.cols) / 2;
 	rec_e.y = (padMat.cols > padMat.rows) ? (padMat.cols - padMat.rows) / 2 : 0;

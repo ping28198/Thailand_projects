@@ -1,0 +1,4 @@
+#load_system_dawg 0
+#tessedit_char_whitelist 0123456789-
+user_patterns_file E:\cpp_projects\Thailand_projects\Projects\_run_dir\Tag_patterns_config.txt
+

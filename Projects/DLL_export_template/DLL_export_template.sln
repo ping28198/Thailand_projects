@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DLL_export_template", "DLL_
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DLL_test", "DLL_test\DLL_test.vcxproj", "{C7620299-9908-4302-A57C-CE5E831D0D61}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cutParcel", "cutParcel\cutParcel.vcxproj", "{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -31,6 +33,14 @@ Global
 		{C7620299-9908-4302-A57C-CE5E831D0D61}.Release|x64.Build.0 = Release|x64
 		{C7620299-9908-4302-A57C-CE5E831D0D61}.Release|x86.ActiveCfg = Release|Win32
 		{C7620299-9908-4302-A57C-CE5E831D0D61}.Release|x86.Build.0 = Release|Win32
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Debug|x64.ActiveCfg = Debug|x64
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Debug|x64.Build.0 = Debug|x64
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Debug|x86.ActiveCfg = Debug|Win32
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Debug|x86.Build.0 = Debug|Win32
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Release|x64.ActiveCfg = Release|x64
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Release|x64.Build.0 = Release|x64
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Release|x86.ActiveCfg = Release|Win32
+		{D6AD0BE1-0365-4219-8C5A-4541A6621BFC}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
