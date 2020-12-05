@@ -8,18 +8,24 @@
 #include <vector>
 #include <string>
 #include "ImageProcessFunc.h"
+#include "cutParcel.h"
 using namespace std;
 using namespace cv;
 int test_HDR_digits();
 int adJustBrightness(cv::Mat& src, double alpha, double beta, double anchor);
 int makeBoarderConstant(cv::Mat &srcMat, unsigned char boarder_value, int boarder_width);
+int test_cut_parcelbox();
+
+
+
 
 int main()
 {
     std::cout << "Hello World!\n"; 
 
 
-	test_HDR_digits();
+	//test_HDR_digits();
+	test_cut_parcelbox();
 
 
 
@@ -31,6 +37,28 @@ int main()
 
 
 }
+
+
+int test_cut_parcelbox()
+{
+	string src_img = "F:\\cpte_datasets\\AlignCenter\\15\\769XG-PS001_20201009153016044_01_0555_0000000000_GR_QR608370986242,608370986242_Top.jpg";
+	
+	std::vector<std::string> flist;
+	CommonFunc::getAllFilesNameInDir("F:\\cpte_datasets\\parcelCut", flist, true, true);
+	for (int i = 0; i < flist.size(); i++)
+	{
+		string dst_img = flist[i] + ".jpg";
+		cutParcel((char*)flist[i].c_str(), (char*)dst_img.c_str(), 1, 0.5, 100, 1);
+	}
+
+	
+
+	return 1;
+}
+
+
+
+
 
 
 int test_HDR_digits()

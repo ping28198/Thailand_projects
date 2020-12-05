@@ -68,6 +68,13 @@ public:
 	//************************************
 	static std::string getExtensionFilename(std::string srcPath);
 
+	//************************************
+	// 函数:    getShortFilename		
+	// 作用： 获得短文件名，不包括后缀，例如："d:/abc.jpg" => "abc"
+	// 全名:  CommonFunc::getShortFilename		
+	// 返回值:   std::string		#
+	// 参数: std::string srcPath			#
+	//************************************
 	static std::string getShortFilename(std::string srcPath);
 
 	//************************************
@@ -77,6 +84,6 @@ public:
 	// 返回值:   const char*		#
 	// 参数: const wchar_t * srcWChar			#
 	//************************************
-	static const char* WCharToMChar(const wchar_t* srcWChar);
-	static const wchar_t* MCharToWChar(const char* srcChar);
+	static const char* WCharToMChar(const wchar_t* srcWChar, char *dstMChar = NULL);
+	static const wchar_t* MCharToWChar(const char* srcChar, wchar_t *dstWChar = NULL);
 };

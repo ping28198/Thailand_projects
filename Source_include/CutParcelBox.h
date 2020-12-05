@@ -42,7 +42,7 @@ public:
 	// Parameter: double binaryThreshold //灰度分割阈值
 	//************************************
 	int getMailBox(std::string &srcImgPath, std::string &dstImgPath, int applid_rotate = 1,
-		double boxSizeThreshold=1, double binaryThreshold= default_pixel_threshold);
+		double boxSizeThreshold=1, double binaryThreshold= default_pixel_threshold,int is_top=1);
 
 	//************************************
 	// Method:    getMailBox_c
@@ -56,7 +56,7 @@ public:
 	// Parameter: double binaryThreshold //灰度分割阈值
 	//************************************
 	int getMailBox_c(const char* pSrcImgPath, const char* pDstImgPath, int applid_rotate = 1,
-		double boxSizeThreshold = 1, double binaryThreshold = default_pixel_threshold);
+		double boxSizeThreshold = 1, double binaryThreshold = default_pixel_threshold, int is_top = 1);
 
 	//适应box的形状最小化
 	//************************************
@@ -98,11 +98,13 @@ public:
 	//************************************
 	int getMailBox_side(cv::Mat &srcMat, cv::Mat &dstMat,
 		double boxSizeThreshold = 1.0, double binaryThreshold = 5.0);
-	int getMailBox_side(cv::Mat &srcMat, cv::Rect &dstRect,
-		double boxSizeThreshold = 1.0, double binaryThreshold = 5.0);
+	int getMailBox_side(cv::Mat &srcmat, cv::Rect &dstRect,
+		double boxSizeThreshold /*= 50*/, double binaryThreshold /*= 5*/);
 
 public:
 	static int findRect(std::vector<cv::Point> contour, cv::Rect &mrect);
 	static int getMatFromRotateRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc);
 	static int CropRect(cv::Rect main_rect, cv::Rect &to_crop_rect);
+	static int check_parcel(cv::Mat &srcm);
+	static int adptive_threshold(cv::Mat &srcm, float _percent);
 };

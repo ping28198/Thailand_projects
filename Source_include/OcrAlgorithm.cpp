@@ -518,9 +518,11 @@ int OcrAlgorithm::_getOcrRoi(Mat& src_img, std::vector<cv::Mat> &roi_imgs)
 
 int OcrAlgorithm::_runOcr(Mat& RoiMat, char* pResults, size_t bufferlenth)
 {
-
+	//CommonFunc::get_exe_dir();
+	char *configs[] = { "tag.patterns.config", "load_system_dawg=0"};
+	int configs_size = 2;
 	tesseract::TessBaseAPI tess;
-	if (tess.Init("./tessdata", "eng"))
+	if (tess.Init("./tessdata", "eng",tesseract::OcrEngineMode::OEM_TESSERACT_LSTM_COMBINED,configs, configs_size, NULL, NULL,false))
 	{
 #ifdef _DEBUG
 		std::cout << "OCRTesseract: Could not initialize tesseract." << std::endl;
