@@ -1,6 +1,6 @@
 #include "PostcodeAlgorithm.h"
 #include <onnxruntime_cxx_api.h>
-#include <cuda_provider_factory.h>
+//#include <cuda_provider_factory.h>
 #include <array>
 #include <iostream>
 #include "time.h"
@@ -31,6 +31,7 @@ int importMat_(void *p_args)
 	cv::copyMakeBorder(m, m, (args->height_ - args->new_height + 1) / 2, (args->height_ - args->new_height) / 2,
 		(args->width_ - args->new_width + 1) / 2, (args->width_ - args->new_width) / 2, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
 	m.convertTo(m, CV_32FC1);//²ÊÉ«
+	m = m / 255.0f;
 	//cv::Mat cm[3];
 	//cv::split(m, cm);
 	//cv::imshow("test", m);
@@ -80,10 +81,10 @@ int TagDetector::initial()
 int TagDetector::initial_model(const wchar_t* model_file, size_t cuda_id /*= 0*/)
 {
 	assert(model_file != nullptr);
-	session_options.SetIntraOpNumThreads(1);
+	//session_options.SetIntraOpNumThreads(1);
 	session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-	if (cuda_id>=0)
-		OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, cuda_id);
+	//if (cuda_id>=0)
+	//	OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, cuda_id);
 
 	//
 
@@ -95,15 +96,52 @@ int TagDetector::initial_model(const wchar_t* model_file, size_t cuda_id /*= 0*/
 
 	env = new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "");
 
-	session_ = new Ort::Session(*env, model_file, session_options);
+	try
+	{
+		session_ = new Ort::Session(*env, model_file, session_options);
+	}
+	catch (const Ort::Exception& e)
+	{
+		std::cout << e.what() <<std::endl;
+		
+	}
+	
+
+	
 
 	return 1;
 }
+std::string print_shape(const std::vector<int64_t>& v) {
+	std::stringstream ss("");
+	for (size_t i = 0; i < v.size() - 1; i++)
+		ss << v[i] << "x";
+	ss << v[v.size() - 1];
+	return ss.str();
+}
 
-int TagDetector::run_detect()
+int TagDetector::run_detect(std::vector<std::vector<cv::RotatedRect>> & rrects, std::vector<std::vector<int>> &cls_inds)
 {
-	session_->Run(Ort::RunOptions{ nullptr }, input_node_names.data(), &input_tensor_, 1,
-		output_node_names.data(), &output_tensor_, 1);
+	//session_->Run(Ort::RunOptions{ nullptr }, input_node_names.data(), &input_tensor_, 1,
+	//	output_node_names.data(), &output_tensor_, 1);
+	try
+	{
+		auto output_tensors = session_->Run(Ort::RunOptions{ nullptr }, input_node_names.data(), &input_tensor_, 1, output_node_names.data(), 1);
+		for (int i=0;i<output_tensors.size();i++)
+		{
+			auto output_shape = output_tensors[i].GetTensorTypeAndShapeInfo().GetShape();
+			float *pData = output_tensors[i].GetTensorMutableData<float>();
+			int obj_num = output_shape[0];
+			convert_to_rrects(pData, obj_num, i, rrects[i], cls_inds[i]);
+		}
+
+	}
+	catch (const Ort::Exception& e)
+	{
+		std::cout << e.what() << std::endl;
+
+	}
+	
+
 	return 1;
 }
 
@@ -155,61 +193,50 @@ void TagDetector::importMat_gpu(std::vector<cv::Mat> &srcms)
 
 }
 
-void TagDetector::convert_to_rrects(std::array<float, MAX_IMAGE_NUM * MAX_BOX_NUM * FEATS_PER> *src_data, 
-	std::vector<std::vector<cv::RotatedRect>> & rrects, std::vector<std::vector<int>> &cls_inds)
+void TagDetector::convert_to_rrects(float *src_data, size_t num_objs, size_t image_ind,
+	std::vector<cv::RotatedRect> & rrects, std::vector<int> &cls_inds)
 {
-	for (int n = 0; n < m_real_input_num; n++)
+	const int feats_per = 7;
+	std::vector<std::array<cv::Point2f, 4>> parcels;
+	//parcels.reserve(MAX_BOX_NUM);
+	//one_res.reserve(MAX_BOX_NUM);
+
+	cv::Point2f _cent;
+	cv::Point2f _size;
+	cv::RotatedRect rrc;
+	for (int n = 0; n < num_objs; n++)
 	{
-		std::vector<std::array<cv::Point2f, 4>> parcels;
-		//parcels.reserve(MAX_BOX_NUM);
-		std::vector<cv::RotatedRect> one_res;
-		//one_res.reserve(MAX_BOX_NUM);
-		std::vector<int> cls_;
-		cv::Point2f _cent;
-		cv::Point2f _size;
-		cv::RotatedRect rrc;
-		for (int b = 0; b < MAX_BOX_NUM; b++)
-		{
-			float *pData = src_data->data() + n * MAX_BOX_NUM * FEATS_PER + b * FEATS_PER;
+
+		float *pData = src_data + n * FEATS_PER;
 #ifdef DEBUG_ONNX_EFFICIENTDET_R0
-			printf("detect box %d: %f %f %f %f %f %f %f %f\n", b, pData[0], pData[1], pData[2], pData[3],
-				pData[4], pData[5], pData[6], pData[7]);
+		printf("detect box %d: %f %f %f %f %f %f %f\n", n, pData[0], pData[1], pData[2], pData[3],
+			pData[4], pData[5], pData[6]);
 #endif
-			if (pData[0] < 0.5) break; //ÅÐ¶Ï½áÎ²
-			//if (pData[1] > 0.998) continue; //µ÷ÊÔ
-			if (pData[1] < this->m_confidence_threshold) continue;
-
-
-			std::array<float, 8> points_m;
-			_size.x = pData[6] < 1 ? 1 : pData[6];
-			_size.y = pData[5] < 1 ? 1 : pData[5];
-			_cent.x = pData[3];
-			_cent.y = pData[4];
-			float theta = -pData[7] / CV_PI * 180;
-			//theta = (theta > 90) ? (90 - theta) : theta;
-			rrc.angle = theta;
-			rrc.center = _cent;
-			rrc.size = _size;
-			one_res.push_back(rrc);
-			cls_.push_back(floor(pData[2]));
-		}
-		nms_multi_class(one_res, cls_, this->m_iou_threshold);
-		cv::Point2f scal_pt(shift_x[n], shift_y[n]);
-
-		//»Ø¸´µ½Ô­Ê¼Í¼Ïñ³ß´ç
-		for (int i = 0; i < one_res.size(); i++)
-		{
-			one_res[i].center -= scal_pt;
-			one_res[i].center.x /= resize_scal[n];
-			one_res[i].center.y /= resize_scal[n];
-			one_res[i].size.height /= resize_scal[n];
-			one_res[i].size.width /= resize_scal[n];
-		}
-
-		rrects[n] = one_res;
-		cls_inds[n] = (cls_);
+		if (pData[5] < this->m_confidence_threshold) continue;
+		_size.x = pData[3] < 1 ? 1 : pData[3];
+		_size.y = pData[2] < 1 ? 1 : pData[2];
+		_cent.x = pData[0];
+		_cent.y = pData[1];
+		float theta = -pData[4] / CV_PI * 180;
+		//theta = (theta > 90) ? (90 - theta) : theta;
+		rrc.angle = theta;
+		rrc.center = _cent;
+		rrc.size = _size;
+		rrects.push_back(rrc);
+		cls_inds.push_back(floor(pData[6]));
 	}
 
+	nms_multi_class(rrects, cls_inds, this->m_iou_threshold);
+	cv::Point2f scal_pt(shift_x[image_ind], shift_y[image_ind]);
+	//»Ö¸´µ½Ô­Ê¼Í¼Ïñ³ß´ç
+	for (int i = 0; i < rrects.size(); i++)
+	{
+		rrects[i].center -= scal_pt;
+		rrects[i].center.x /= resize_scal[image_ind];
+		rrects[i].center.y /= resize_scal[image_ind];
+		rrects[i].size.height /= resize_scal[image_ind];
+		rrects[i].size.width /= resize_scal[image_ind];
+	}
 }
 
 void TagDetector::nms_rotated_rect(std::vector<cv::RotatedRect> &rects, float iou_threshold)
@@ -236,6 +263,12 @@ void TagDetector::nms_rotated_rect(std::vector<cv::RotatedRect> &rects, float io
 				it1++;
 				continue;
 			}
+			if (c_dist<std::min(it0->size.width, it0->size.width) || c_dist < std::min(it1->size.width, it1->size.width))
+			{
+				it1 = rects.erase(it1);
+				continue;
+			}
+
 			std::vector<cv::Point2f> contour;
 			cv::rotatedRectangleIntersection(*it0, *it1, contour);
 			if (contour.size() < 3)
@@ -268,11 +301,12 @@ void TagDetector::nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vect
 	{
 		return;
 	}
-	std::pair<cv::RotatedRect, int> rct;
+	
 	std::vector<std::pair<cv::RotatedRect, int>> rects_cls;
 	rects_cls.reserve(rects.size());
 	for (size_t i=0;i<rects.size();i++)
 	{
+		std::pair<cv::RotatedRect, int> rct;
 		rct.first = rects[i];
 		rct.second = class_ids[i];
 		rects_cls.push_back(rct);
@@ -359,19 +393,19 @@ void TagDetector::detectParcels(std::vector<cv::Mat> &srcms, std::vector<std::ve
 	clock_t t1 = clock();
 	double timeconsume = (double)(t1 - t0);
 	std::cout << "pre-process time consume:" << timeconsume << "ms" << std::endl;
-	run_detect();
+	run_detect(rrects,cls_inds);
 	t0 = clock();
 	timeconsume = (double)(t0 - t1);
 	std::cout << "model time consume:" << timeconsume << "ms" << std::endl;
-	convert_to_rrects(&results_, rrects, cls_inds);
+	
 	t1 = clock();
 	timeconsume = (double)(t1 - t0);
 	std::cout << "post-process time consume:" << timeconsume << "ms" << std::endl;
 #else
 
 	importMat(srcms);
-	run_detect();
-	convert_to_rrects(&results_, rrects, cls_inds);
+	run_detect(rrects, cls_inds);
+	//convert_to_rrects(&results_, rrects, cls_inds);
 
 #endif // DEBUG_ONNX_EFFICIENTDET_R0
 

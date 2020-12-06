@@ -149,7 +149,45 @@ void test_tag_ocr()
 
 
 
+int getMatFromRotateRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc)
+{
+	cv::Rect boxRec = rRc.boundingRect();
+	//cv::Rect boxRec_n(0, 0, boxRec.width, boxRec.height);
 
+	cv::Mat padMat = cv::Mat::zeros(boxRec.size(), src_mat.type());
+	padMat = ~padMat;
+	cv::Rect cropRect = boxRec;
+	int res = ImageProcessFunc::CropRect(cv::Rect(0, 0, src_mat.cols, src_mat.rows), cropRect);
+	if (!res) return 0;
+	cv::Mat boxMat = src_mat(cropRect);
+	cv::Rect copyRect(cropRect.x - boxRec.x, cropRect.y - boxRec.y, cropRect.width, cropRect.height);
+	boxMat.copyTo(padMat(copyRect));
+	int max_lenth = std::max(padMat.cols, padMat.rows);
+
+	cv::Mat padMat_e = cv::Mat::zeros(cv::Size(max_lenth, max_lenth), src_mat.type());
+	padMat_e = ~padMat_e;
+	cv::Rect rec_e;
+	rec_e.x = (padMat.cols > padMat.rows) ? 0 : (padMat.rows - padMat.cols) / 2;
+	rec_e.y = (padMat.cols > padMat.rows) ? (padMat.cols - padMat.rows) / 2 : 0;
+	rec_e.width = padMat.cols;
+	rec_e.height = padMat.rows;
+
+	padMat.copyTo(padMat_e(rec_e));
+
+	cv::Mat affine_matrix = cv::getRotationMatrix2D(cv::Point2f(padMat_e.cols / 2.0f, padMat_e.rows / 2.0f), rRc.angle, 1.0);//求得旋转矩阵    
+	cv::warpAffine(padMat_e, padMat_e, affine_matrix, padMat_e.size());     //计算图像旋转之后包含图像的最大的矩形    
+
+	cv::Rect cropRec;
+	cropRec.x = padMat_e.cols / 2 - rRc.size.width / 2;
+	cropRec.y = padMat_e.rows / 2 - rRc.size.height / 2;
+	cropRec.width = rRc.size.width;
+	cropRec.height = rRc.size.height;
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, padMat_e.cols, padMat_e.rows), cropRec);
+
+	dst_mat = padMat_e(cropRec);
+
+	return 1;
+}
 
 
 
@@ -158,31 +196,32 @@ void test_tag_detection()
 {
 	const int image_num = 1;
 	std::vector<std::string> model_names;
-	model_names.push_back("efficientdetd0_one.onnx");
-	model_names.push_back("efficientdetd0_two.onnx");
+	model_names.push_back("yolov5_one.onnx");
+	model_names.push_back("yolov5_two.onnx");
 	model_names.push_back("efficientdetd0_three.onnx");
 	model_names.push_back("efficientdetd0_four.onnx");
 	std::string exe_dir = CommonFunc::get_exe_dir();
 	std::string modelfile = CommonFunc::joinFilePath(exe_dir, model_names[image_num - 1]);
 	
 	//modelfile = "E:\\python_projects\\Yet-Another-EfficientDet-Pytorch\\efficientdetd0_one.onnx";
-	modelfile = "E:\\python_projects\\Tailand_tag_detect\\RotatedBoundingBox\\efficientdetd0_one.onnx";
+	//modelfile = "E:\\python_projects\\Tailand_tag_detect\\RotatedBoundingBox\\efficientdetd0_one.onnx";
+	modelfile = "E:\\python_projects\\Thailand_projects\\RBbox_yolov5\\weights\\last.onnx";
 	int cuda_ind = 0;
 
 	std::cout << "model path:" << modelfile << std::endl;
 	wchar_t modelfilew[512] = { 0 };
 	CommonFunc::MCharToWChar(modelfile.c_str(), modelfilew);
-	TagDetector parcelRecop(modelfilew, 0.9, cuda_ind, image_num);
+	TagDetector parcelRecop(modelfilew, 0.75, cuda_ind, image_num);
 	cout << "using cuda:" << cuda_ind << endl;
 	//parcelRecop.set_transform(1., 1., 0, 0);
 	parcelRecop.initial();
 
 	std::string dir = CommonFunc::joinFilePath(exe_dir, "/images/*.jpg");
 	//dir = "F:\\cpte_datasets\\SeperateParcel\\P20200410_images\\*.jpg";
-	dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_obj_datasets_3\\*.jpg";
+	dir = "E:\\datasets\\thailand_tag\\*.jpg";
 
 
-	string saving_dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag_3";
+	string saving_dir = "E:\\datasets\\thailand_tag_cuts";
 
 
 	std::cout << "image dir:" << dir << std::endl;
@@ -237,18 +276,17 @@ void test_tag_detection()
 
 		for (int j = 0; j < cls_inds[0].size(); j++)
 		{
-			if (cls_inds[0][j] == 2)
+
+			Mat tag_mat;
+			ImageProcessFunc::getMatFromRotatedRect(mats[0], tag_mat, rrects[0][j]);
+			if (!tag_mat.empty())
 			{
-				Mat tag_mat;
-				ImageProcessFunc::getMatFromRotatedRect(mats[0], tag_mat, rrects[0][j]);
-				if (!tag_mat.empty())
-				{
-					t0 = clock();
-					string name = to_string(t0) + ".jpg";
-					name = CommonFunc::joinFilePath(saving_dir, name);
-					cv::imwrite(name, tag_mat);
-				}
+				t0 = clock();
+				string name = to_string(cls_inds[0][j]) +"_"+ to_string(t0) + ".jpg";
+				name = CommonFunc::joinFilePath(saving_dir, name);
+				cv::imwrite(name, tag_mat);
 			}
+			
 		}
 
 
@@ -398,9 +436,9 @@ int main()
 {
     std::cout << "Hello World!\n"; 
 	cv::Mat m;
-	//test_tag_detection();
+	test_tag_detection();
 	//test_tag_ocr();
-	test_arb_ocr();
+	//test_arb_ocr();
 
 
 

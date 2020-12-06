@@ -14,9 +14,9 @@
 
 
 
-//#define DEBUG_ONNX_EFFICIENTDET_R0
+#define DEBUG_ONNX_EFFICIENTDET_R0
 //#define POSTCODE_ROI_DEBUG
-#define ARBITURARY_TAG_DEBUG
+//#define ARBITURARY_TAG_DEBUG
 
 
 class MatchDataStruct
@@ -29,6 +29,24 @@ public:
 	int getMatchDataFromImg_tag_line(const std::string &refImg1);
 
 };
+
+
+
+class ObjectInfo
+{
+public:
+	int m_class = 0;
+	float score = 0.0f;
+	cv::RotatedRect rBox;
+
+
+};
+
+
+
+
+
+
 
 
 
@@ -99,14 +117,14 @@ public:
 	int initial();
 
 private:
-	static const int MAX_IMAGE_NUM = 2;
+	static const int MAX_IMAGE_NUM = 1;
 	static const int WIDTH_ = 512;
 	static const int HEIGHT_ = 512;
 	static const int CHANNEL_ = 3;
 	
 
 	//static const int MAX_BOX_NUM = 128;
-	static const int FEATS_PER = 8;
+	static const int FEATS_PER = 7;
 
 	std::array<float, MAX_IMAGE_NUM * WIDTH_ * HEIGHT_ * CHANNEL_> *input_image_ = NULL; //输入图像数据位置
 	std::array<float, MAX_IMAGE_NUM * MAX_BOX_NUM * FEATS_PER> results_{ 0 }; //输出结果
@@ -161,14 +179,14 @@ private:
 private:
 	int initial_model(const wchar_t* model_file, size_t cuda_id = 0);
 
-	int run_detect();
+	int run_detect(std::vector<std::vector<cv::RotatedRect>> & rrects, std::vector<std::vector<int>> &cls_inds);
 
 	void importMat(std::vector<cv::Mat> & srcms);
 	void importMat_cpu(std::vector<cv::Mat> & srcms);
 	void importMat_gpu(std::vector<cv::Mat> &srcms);
 
-	void convert_to_rrects(std::array<float, MAX_IMAGE_NUM * MAX_BOX_NUM * FEATS_PER> *src_data,
-		std::vector<std::vector<cv::RotatedRect>> & rrects, std::vector<std::vector<int>> &cls_inds);
+	void convert_to_rrects(float *src_data,size_t num_objs, size_t image_ind,
+		std::vector<cv::RotatedRect> & rrects, std::vector<int> &cls_inds);
 
 
 	void nms_rotated_rect(std::vector<cv::RotatedRect> &rects, float iou_threshold);
