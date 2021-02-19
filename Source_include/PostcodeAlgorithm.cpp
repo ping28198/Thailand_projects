@@ -30,7 +30,7 @@ int importMat_(void *p_args)
 
 	cv::copyMakeBorder(m, m, (args->height_ - args->new_height + 1) / 2, (args->height_ - args->new_height) / 2,
 		(args->width_ - args->new_width + 1) / 2, (args->width_ - args->new_width) / 2, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
-	m.convertTo(m, CV_32FC1);//²ÊÉ«
+	m.convertTo(m, CV_32FC1);
 	m = m / 255.0f;
 	//cv::Mat cm[3];
 	//cv::split(m, cm);

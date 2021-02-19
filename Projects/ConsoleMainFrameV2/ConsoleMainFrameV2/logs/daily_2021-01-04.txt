@@ -1,0 +1,8 @@
+[2021-01-04 12:19:14.777] [daily_logger] [info] Welcome to spdlog version 1.8.1  !
+[2021-01-04 12:19:14.777] [daily_logger] [warning] Easy padding in numbers like 00000012
+[2021-01-04 12:19:14.777] [daily_logger] [critical] Support for int: 42;  hex: 2a;  oct: 52; bin: 101010
+[2021-01-04 12:19:14.777] [daily_logger] [info] Support for floats 1.23
+[2021-01-04 12:19:14.777] [daily_logger] [info] Positional args are supported too..
+[2021-01-04 12:19:14.777] [daily_logger] [info]    right aligned, left     aligned
+[2021-01-04 12:19:14.777] [daily_logger] [debug] This message should be displayed..
+[12:19:14 +08:00] [I] [thread 36300] This an info message with custom format

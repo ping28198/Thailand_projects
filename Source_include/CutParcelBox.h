@@ -105,6 +105,6 @@ public:
 	static int findRect(std::vector<cv::Point> contour, cv::Rect &mrect);
 	static int getMatFromRotateRect(const cv::Mat &src_mat, cv::Mat &dst_mat, cv::RotatedRect rRc);
 	static int CropRect(cv::Rect main_rect, cv::Rect &to_crop_rect);
-	static int check_parcel(cv::Mat &srcm);
+	static int check_parcel(cv::Mat &srcm, float threshold=0.5);
 	static int adptive_threshold(cv::Mat &srcm, float _percent);
 };

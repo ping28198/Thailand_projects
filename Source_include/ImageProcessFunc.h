@@ -19,7 +19,7 @@ public:
 	// 参数: double beta				#亮度调整像素
 	// 参数: double anchor			#对比度调整锚点
 	//************************************
-	static int adJustBrightness(cv::Mat& src, double alpha, double beta, double anchor);
+	static int adJustBrightness(cv::Mat& src, float alpha, float beta, float anchor);
 
 
 	//************************************
@@ -37,7 +37,7 @@ public:
 	static void rotate_arbitrarily_angle(cv::Mat &src, cv::Mat &dst, float angle);
 
 	//axis = 0 ,沿着x轴投影到y 轴，axis=1,相反
-	static int sumPixels(cv::Mat &srcimg, int axis, std::vector<unsigned int> &resultsVec);
+	static int sumPixels(const cv::Mat &srcimg, int axis, std::vector<unsigned int> &resultsVec);
 
 	//************************************
 	// 函数:    getAverageBrightness		
@@ -102,6 +102,9 @@ public:
 	// 参数: std::vector<cv::Point2f> & points_vec			#
 	// 参数: double angle			#
 	//************************************
-	int rotatePoints(std::vector<cv::Point2f> & points_vec, double angle,cv::Point2f center_point= cv::Point2f(0,0)); //移动至原点
-	int rotatePoints(std::vector<cv::Point> & points_vec, double angle, cv::Point center_point= cv::Point(0,0));
+	static int rotatePoints(std::vector<cv::Point2f> & points_vec, double angle,cv::Point2f center_point= cv::Point2f(0,0)); //移动至原点
+	static int rotatePoints(std::vector<cv::Point> & points_vec, double angle, cv::Point center_point= cv::Point(0,0));
+
+	static int drawRotateRect(cv::Mat &srcm,const cv::RotatedRect &rc,int thickness,const cv::Scalar &color);
+
 };

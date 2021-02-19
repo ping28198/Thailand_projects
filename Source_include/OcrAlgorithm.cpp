@@ -4116,8 +4116,6 @@ int HWDigitsOCR::getPostcodeLine(const cv::Mat &srcMat, cv::Mat &refMat, cv::Mat
 	Correct_range_mat(post_code_rect).copyTo(dstMat);
 
 
-
-
 	//确定参考区域位置
 	cv::Rect refRect;
 	refRect.width = Correct_range_mat.cols * 0.35;

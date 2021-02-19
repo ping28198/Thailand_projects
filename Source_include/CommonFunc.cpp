@@ -14,7 +14,15 @@ CommonFunc::CommonFunc()
 int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool isIncludeSubDir/*=false*/, bool isReturnPath/*=false*/)
 {
 	HANDLE hFind;
+	
+#ifdef UNICODE
 	WIN32_FIND_DATA findData;
+#else
+	WIN32_FIND_DATAW findData;
+#endif // UNICODE
+
+
+
 	//LARGE_INTEGER size;
 	string base_dir,new_dir,suffix;
 	//dir.replace(dir.begin(), dir.end(), '\\', '/');
@@ -61,7 +69,13 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 		new_dir = base_dir + "/" + suffix;
 	}
 	USES_CONVERSION;
+
+#ifdef UNICODE
 	hFind = FindFirstFileW(A2T(new_dir.c_str()), &findData);
+#else
+	hFind = FindFirstFileW((LPCWSTR)new_dir.c_str(), &findData);
+#endif // UNICODE
+
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
 		//cout << "Failed to find first file!\n";
@@ -90,7 +104,15 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 	//查找文件
 	new_dir.clear();
 	new_dir = base_dir + "/" + suffix;
+	
+#ifdef UNICODE
 	hFind = FindFirstFileW(A2T(new_dir.c_str()), &findData);
+#else
+	hFind = FindFirstFileW((LPCWSTR)new_dir.c_str(), &findData);
+#endif // UNICODE
+
+
+
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
 		cout << "Failed to find first file!\n";
@@ -103,7 +125,13 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 		{
 			//WideCharToMultiByte(CP_ACP, 0, findData.cFileName, 256, tmp, 256, 0, 0);
 			//str1 = std::string(tmp);
+
+#ifdef UNICODE
 			str1 = CommonFunc::WCharToMChar(findData.cFileName);
+#else
+			str1 = findData.cFileName;
+#endif // UNICODE
+
 			if (strcmp(str1.c_str(), ".") == 0 || strcmp(str1.c_str(), "..") == 0)
 				continue;
 			if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)    // 是否是目录 
@@ -121,7 +149,13 @@ int CommonFunc::getAllFilesNameInDir(string dir, vector<string> &filenames, bool
 					filenames.push_back(str1);
 				}
 			}
+#ifdef UNICODE
 		} while (FindNextFile(hFind, &findData));
+#else
+		} while (FindNextFileW(hFind, &findData));
+#endif // UNICODE
+
+		
 	}
 
 	return filenames.size();
@@ -356,4 +390,7 @@ const wchar_t* CommonFunc::MCharToWChar(const char* srcChar,wchar_t *dstWChar)
 	}
 	return wtmp;
 }
+
+
+
 

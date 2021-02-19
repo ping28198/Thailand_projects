@@ -85,8 +85,8 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>$(SolutionDir)..\..\external_libs\$(Configuration);$(LibraryPath)</LibraryPath>
-    <IncludePath>$(SolutionDir)..\..\external_include\Tesseract;$(SolutionDir)..\..\external_include\opencv;$(SolutionDir)..\..\external_include\onnxruntime;$(SolutionDir)..\..\Source_include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <LibraryPath>$(ONNXRUNTIME_DIR)\lib;$(SolutionDir)..\..\external_libs\$(Configuration);$(OPENCV_DIR)\x64\vc14\lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(SolutionDir)..\..\external_include\Tesseract;$(OPENCV_DIR)\include;$(ONNXRUNTIME_DIR)\include;$(SolutionDir)..\..\Source_include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <OutDir>$(SolutionDir)..\_run_dir\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -156,19 +156,19 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>gif.lib;jpeg.lib;leptonica-1.76.0.lib;libpng16.lib;lzma.lib;tesseract41.lib;opencv_img_hash343.lib;opencv_world343.lib;onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>gif.lib;jpeg.lib;leptonica-1.76.0.lib;libpng16.lib;lzma.lib;tesseract41.lib;opencv_world450.lib;onnxruntime.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\Source_include\CommonFunc.h" />
     <ClInclude Include="..\..\..\Source_include\ImageProcessFunc.h" />
-    <ClInclude Include="..\..\..\Source_include\PostcodeAlgorithm.h" />
+    <ClInclude Include="..\..\..\Source_include\PostcodeAlgorithm_v1.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\Source_include\CommonFunc.cpp" />
     <ClCompile Include="..\..\..\Source_include\ImageProcessFunc.cpp" />
-    <ClCompile Include="..\..\..\Source_include\PostcodeAlgorithm.cpp" />
+    <ClCompile Include="..\..\..\Source_include\PostcodeAlgorithm_v1.cpp" />
     <ClCompile Include="AlgorithmsV2.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

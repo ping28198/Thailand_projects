@@ -7,3 +7,4 @@ $(SolutionDir)..\..\external_include\tensorflow\external\protobuf_archive\src
 $(SolutionDir)..\..\external_include\tensorflow\external\com_google_absl
 $(SolutionDir)..\..\external_include\tensorflow\external\eigen_archive
 $(SolutionDir)..\..\external_include\ZXing
+$(SolutionDir)..\..\external_include\spdlog

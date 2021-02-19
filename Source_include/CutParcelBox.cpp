@@ -234,7 +234,7 @@ int CutParcelBox::getMailBox_Mat(cv::Mat &srcMat, cv::Mat &dstMat, int applid_ro
 	}
 	rMat.copyTo(dstMat);
 
-	return check_parcel(dstMat);
+	return check_parcel(dstMat, binaryThreshold);
 
 	return 1;
 }
@@ -551,9 +551,10 @@ unsigned int getHash(const cv::Mat& image) {
 
 
 
-int CutParcelBox::check_parcel(cv::Mat &srcm)
+int CutParcelBox::check_parcel(cv::Mat &srcm, float threshold)
 {
-	using namespace ZXing;
+	threshold = (threshold > 1) ? 1 : threshold;
+	threshold = (threshold < 0) ? 0 : threshold;
 	
 	if (srcm.empty()) return 0;
 	if (srcm.rows < srcm.cols)
@@ -642,14 +643,14 @@ int CutParcelBox::check_parcel(cv::Mat &srcm)
 	std::cout << "pix stdvar:" << stddev_pxl << std::endl;
 #endif // CUT
 
-	if (mean_pxl < 100)
+	if (mean_pxl < 100*threshold*2)
 	{
 #ifdef CUT_PARCEL_BOX_DEBUG
 		std::cout << "warning, pix mean is lower than 100:" << std::endl;
 #endif // CUT
 		return 0;
 	}
-	if (stddev_pxl< 45)
+	if (stddev_pxl < 45*threshold*2)
 	{
 #ifdef CUT_PARCEL_BOX_DEBUG
 		std::cout << "warning, pix stddev is lower than 45:" << std::endl;
@@ -672,15 +673,24 @@ int CutParcelBox::check_parcel(cv::Mat &srcm)
 
 	
 
-	if (mean_pxl < 18 || mean_pxl > 45)
+	if (mean_pxl < (18*threshold*2))
 	{
 #ifdef CUT_PARCEL_BOX_DEBUG
-		std::cout << "warning, canny mean is exception:" << std::endl;
+		std::cout << "warning, canny mean too low:" << std::endl;
 #endif // CUT
 		return 0;
 	}
 
-	if (stddev_pxl< 65)
+	if (mean_pxl > (45 + (0.5 - threshold) * 40))
+	{
+#ifdef CUT_PARCEL_BOX_DEBUG
+		std::cout << "warning, canny mean too high:" << std::endl;
+#endif // CUT
+		return 0;
+	}
+
+
+	if (stddev_pxl< 70 * threshold * 2)
 	{
 #ifdef CUT_PARCEL_BOX_DEBUG
 		std::cout << "warning, canny dev is exception:" << std::endl;

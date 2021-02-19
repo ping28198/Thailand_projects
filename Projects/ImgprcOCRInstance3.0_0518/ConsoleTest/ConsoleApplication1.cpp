@@ -15,7 +15,7 @@
 using namespace std;
 
 int server();
-int get_send_msg(unsigned char *pBuffer, vector<string> imgpaths, int istopview);
+
 int String2RawBytes(unsigned char* pString, int string_length, unsigned char* pBytes);
 void ProcessOneRMes(MPFCommuication *pcomm, BYTE mbMesPos);
 default_random_engine e;
@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
 
 	system("Pause");
 }
-int get_send_msg(unsigned char *pBuffer,vector<string> imgpaths,int istopview)
+int get_send_msg(unsigned char *pBuffer,vector<string> imgpaths,int istopview, int isbotview)
 {
 	unsigned char *pos;
 	unsigned char msg_data[512*5] = { 0 };
@@ -38,7 +38,7 @@ int get_send_msg(unsigned char *pBuffer,vector<string> imgpaths,int istopview)
 	pos++;
 
 	int newline = 0;
-	msg_data[newline++] = 0x40;
+	msg_data[newline++] = 0xF0;
 	msg_data[newline++] = 0xC4;
 	// TaskID
 	//int id =  % 1000000;
@@ -51,8 +51,8 @@ int get_send_msg(unsigned char *pBuffer,vector<string> imgpaths,int istopview)
 	msg_data[newline++] = (taskID / int(pow(256, 2))) % 256;
 	msg_data[newline++] = (taskID / int(pow(256, 1))) % 256;
 	msg_data[newline++] = (taskID / int(pow(256, 0))) % 256;
-	msg_data[newline++] = (imgpaths.size()>1)?1:4; //补码类型
-	msg_data[newline++] = imgpaths.size();
+	msg_data[newline++] = (imgpaths.size() > 1) ? 1 : 4; //补码类型
+	msg_data[newline++] = imgpaths.size();  //图像数量
 	string img_path_tmp;
 	for (int i=0;i<imgpaths.size();i++)
 	{
@@ -65,6 +65,7 @@ int get_send_msg(unsigned char *pBuffer,vector<string> imgpaths,int istopview)
 	sprintf((char*)(msg_data + newline), img_path_tmp.c_str());
 	newline = newline + img_path_len;
 	msg_data[newline++] = istopview % 256;
+	msg_data[newline++] = isbotview; //
 	msg_data[newline++] = 10; //条码长度
 	sprintf((char*)(msg_data + newline), "1234567890");
 	newline = newline + 10;
@@ -144,10 +145,15 @@ int server()
 	}
 
 	//初始化服务器地址族变量
+	std::string ipstr = "192.168.21.21";
+	//std::string ipstr = "127.0.0.1";
+	size_t port = 6006;
+
+
 	SOCKADDR_IN addrSrv;
-	addrSrv.sin_addr.S_un.S_addr = inet_addr("192.168.0.1");//htonl(INADDR_ANY);
+	addrSrv.sin_addr.S_un.S_addr = inet_addr(ipstr.c_str());//htonl(INADDR_ANY);
 	addrSrv.sin_family = AF_INET;
-	addrSrv.sin_port = htons(9999);
+	addrSrv.sin_port = htons(port);
 
 	//绑定
 	iRet = bind(serverSocket, (SOCKADDR*)&addrSrv, sizeof(SOCKADDR));
@@ -166,39 +172,61 @@ int server()
 	}
 	else
 	{
-		cout << "Server is listening on " << addrSrv.sin_addr.S_un.S_addr << ":" << addrSrv.sin_port << "." << endl;
+		cout << "Server is listening on " << ipstr << ":" << port << endl;
 	}
 	vector<string> imgpathvec_top;
 	vector<string> imgpathvec_side;
+	vector<string> imgpathvec_bottom;
 	//string imgdir_side = "F:/shared_data_original/side/*.jpg";
-	string imgdir_side = "F:/20191227/choose/1121-abnormal/*.jpg";
-	//string imgdir_top = "F:/shared_data_original/top/*.jpg";
-	string imgdir_top = "F:\\shared_data_original\\copy_m/*.jpg";
+// 	string imgdir_side = "E:\\datasets\\ThailandPost\\srcimg_side/*.jpg";
+// 	string imgdir_top = "E:\\datasets\\ThailandPost\\src_img_20210104\\*.jpg";
+// 	string imgdir_bottom = "E:\\datasets\\ThailandPost\\srcimg_side\\*.jpg";
+
+	std::string exe_dir = CommonFunc::get_exe_dir();
+	string imgdir_side = exe_dir+ "side\\*.jpg";
+	string imgdir_top = exe_dir+ "top\\*.jpg";
+	string imgdir_bottom = exe_dir+ "bottom\\*.jpg";
+
+	std::cout << "top_dir:" << imgdir_top << std::endl;
+	std::cout << "side_dir:" << imgdir_side << std::endl;
+	std::cout << "bottom_dir:" << imgdir_bottom << std::endl;
+
+
+	//string imgdir_top = "E:\\datasets\\ThailandPost\\srcimg_tp/*.jpg";
 	//string imgdir_top = "F:\\shared_data_original\\top\\pic2/*.jpg";
 	//string imgdir_side = "F:\\shared_data_original\\top\\pic2/*.jpg";
 	//string imgdir = "F:/cpte_datasets/Tailand_tag_detection_datasets/tag_obj_datasets_2/*.jpg";
 	CommonFunc::getAllFilesNameInDir(imgdir_side, imgpathvec_side, true, true);
 	CommonFunc::getAllFilesNameInDir(imgdir_top, imgpathvec_top, true, true);
+	CommonFunc::getAllFilesNameInDir(imgdir_bottom, imgpathvec_bottom, true, true);
 
 	std::random_shuffle(imgpathvec_top.begin(), imgpathvec_top.end());
 	std::random_shuffle(imgpathvec_side.begin(), imgpathvec_side.end());
-
+	std::random_shuffle(imgpathvec_bottom.begin(), imgpathvec_bottom.end());
 
 	vector<string>::iterator it_top = imgpathvec_top.begin();
 	if (it_top == imgpathvec_top.end())
 	{
-		printf("未找到顶部图片\n");
+		printf("find no top images\n");
 		return 0;
 	}
 	vector<string>::iterator it_side = imgpathvec_side.begin();
 	if (it_side == imgpathvec_side.end())
 	{
-		printf("未找到侧面图片\n");
+		printf("find no side images\n");
 		return 0;
 	}
 
-	printf("找到顶部图片数量%d\n", imgpathvec_top.size());
-	printf("找到侧面图片数量%d\n", imgpathvec_side.size());
+	vector<string>::iterator itbotom = imgpathvec_bottom.begin();
+	if (itbotom == imgpathvec_bottom.end())
+	{
+		printf("find no bottom images\n");
+		return 0;
+	}
+
+	printf("find top image num: %d\n", imgpathvec_top.size());
+	printf("find side image num: %d\n", imgpathvec_side.size());
+	printf("find bottom image num: %d\n", imgpathvec_bottom.size());
 	//等待连接_接收_发送
 
 	MPFCommuication mRecOp;
@@ -241,12 +269,13 @@ int server()
 			//发送消息
 			unsigned char sendBuf[4096] = {0};
 			if (it_top == imgpathvec_top.end()) it_top = imgpathvec_top.begin();
-			if (it_top == imgpathvec_top.end()) it_top = imgpathvec_top.begin();
+			if (it_side == imgpathvec_side.end()) it_side = imgpathvec_side.begin();
+			if (itbotom == imgpathvec_bottom.end()) itbotom = imgpathvec_bottom.begin();
 			//int msg_length = get_send_msg(sendBuf,*it);
 			//it++;
 			vector<string> img_sends;
 			uniform_int_distribution<unsigned> u(1, 3);
-			int randNum =  u(e);
+			int randNum = 3;//= u(e);
 			int i = 0;
 			switch (randNum)
 			{
@@ -258,13 +287,18 @@ int server()
 				if (it_side == imgpathvec_side.end()) it_side = imgpathvec_side.begin();
 				img_sends.push_back(*(it_side++));
 				break;
-			case 3: //5幅图
-				for (i=0;i<5;i++) //5幅图
+			case 3: //6幅图
+				for (i=0;i<6;i++) //5幅图
 				{
 					if (i==0)
 					{
 						if (it_top == imgpathvec_top.end()) it_top = imgpathvec_top.begin();
 						img_sends.push_back(*(it_top++));
+					}
+					else if (i==1)
+					{
+						if (itbotom == imgpathvec_bottom.end()) itbotom = imgpathvec_bottom.begin();
+						img_sends.push_back(*(itbotom++));
 					}
 					else
 					{
@@ -279,8 +313,10 @@ int server()
 
 
 			int istopview = (randNum == 2) ? 0 : 1;
+			int isbotview = (randNum == 3) ? 2 : 0;
 
-			int msg_length = get_send_msg(sendBuf, img_sends, istopview);
+			Sleep(2000);
+			int msg_length = get_send_msg(sendBuf, img_sends, istopview,isbotview);
 
 
 			//printf("消息长度：%d\n", msg_length);
@@ -289,7 +325,7 @@ int server()
 			//sprintf_s(sendBuf, "Welcome %s", inet_ntoa(clientAddr.sin_addr));
 			char str[INET_ADDRSTRLEN];
 			//sprintf_s(sendBuf, "Welcome! client from %s %d!", inet_ntop(AF_INET, &clientAddr.sin_addr, str, sizeof(str)), x);
-			sig = send(connSocket, (char*)sendBuf, msg_length + 1, 0);
+			sig = send(connSocket, (char*)sendBuf, msg_length, 0);
 			//int erron = GetLastError();
 			//if (sig<=0 && erron == EAGAIN)
 			//{
@@ -303,7 +339,7 @@ int server()
 			}
 			else
 			{
-				printf("发送了%d幅图像\n", img_sends.size());
+				printf("send %d image\n", img_sends.size());
 			}
 			x++;
 
@@ -339,12 +375,12 @@ int server()
 				ProcessOneRMes(&mRecOp, bTemp1);
 			}
 
-			cout << "解析完毕！" << endl<<endl;
+			cout << "analyse over！" << endl<<endl;
 
 
 			//printf("收到%d个字节\n", sig);
 			//printf("%s\n", recvBuf);
-			Sleep(1000);
+			
 		}
 
 		//关闭连接
@@ -389,18 +425,18 @@ void ProcessOneRMes(MPFCommuication *pcomm,BYTE mbMesPos)
 				v *= pow(256, 5 - i);
 				taskid += v;
 			}
-			std::cout << "ImageID:" << to_string(taskid) << endl;
+			std::cout << "ImageID: " << to_string(taskid) << endl;
 			
 			//ocr_id
-			std::cout << "OCRID:" << unsigned int(*p_c) << endl;
+			std::cout << "OCRID: " << unsigned int(*p_c) << endl;
 			nowpos += 1; p_c = p + nowpos;
 
 			//补码结果
-			std::cout << "补码结果:" << unsigned int(*p_c) << endl;
+			std::cout << "ocr results: " << unsigned int(*p_c) << endl;
 			nowpos += 1; p_c = p + nowpos;
 			
 			//识别出邮编的图像编号
-			std::cout << "图像序号:" << unsigned int(*p_c) << endl;
+			std::cout << "image no: " << unsigned int(*p_c) << endl;
 			nowpos += 1; p_c = p + nowpos;
 
 			//条码
@@ -409,7 +445,7 @@ void ProcessOneRMes(MPFCommuication *pcomm,BYTE mbMesPos)
 
 			memcpy(barcode, p_c, barcode_length);
 			nowpos += barcode_length; p_c = p + nowpos;
-			std::cout << "条码结果:" << barcode << endl;
+			std::cout << "barcode res: " << std::string((char*)barcode) << endl;
 
 			//
 
@@ -420,10 +456,10 @@ void ProcessOneRMes(MPFCommuication *pcomm,BYTE mbMesPos)
 				BYTE postcode[512] = { 0 };
 				memcpy(postcode, p_c, postcode_length);
 				nowpos += postcode_length; p_c = p + nowpos;
-				std::cout << "邮编结果:" << postcode << endl;
+				std::cout << "postcode res: " << std::string((char*)postcode) << endl;
 			}
 
-			std::cout << "排队等侯数量：" << unsigned int(*p_c) << endl;
+			std::cout << "wait for task num: " << unsigned int(*p_c) << endl;
 			//nowpos += postcode_length; p_c = p + nowpos;
 
 

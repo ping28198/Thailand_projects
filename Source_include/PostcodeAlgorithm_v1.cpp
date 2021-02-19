@@ -1,6 +1,9 @@
-#include "PostcodeAlgorithm.h"
+Ôªø#include "PostcodeAlgorithm_v1.h"
 #include <onnxruntime_cxx_api.h>
+#ifdef USE_CUDA_DEVICE
 #include <cuda_provider_factory.h>
+#endif // USE_CUDA_DEVICE
+//
 #include <array>
 #include <iostream>
 #include "time.h"
@@ -11,9 +14,10 @@
 #include <vector>
 #include "ImageProcessFunc.h"
 #include <ThreadPool.h>
-#include "opencv2/xfeatures2d.hpp"
-#include "opencv2/xfeatures2d/nonfree.hpp"
-
+#include "opencv2/features2d.hpp"
+//#include "opencv2/features2d/nonfree.hpp"
+#include "CommonFunc.h"
+#include <fstream>
 using namespace cv;
 using namespace std;
 
@@ -25,12 +29,13 @@ int importMat_(void *p_args)
 	importMat_args *args = (importMat_args *)p_args;
 	cv::Mat srcm = *(args->pMat);
 	cv::Mat m;
-	cv::resize(srcm, m, cv::Size(args->new_width, args->new_height), 0, 0,cv::INTER_AREA);
-	cv::cvtColor(m, m, COLOR_BGR2GRAY);
+	cv::cvtColor(srcm, m, COLOR_BGR2GRAY);
+	cv::resize(m, m, cv::Size(args->new_width, args->new_height), 0, 0, cv::INTER_AREA);
+	
 
 	cv::copyMakeBorder(m, m, (args->height_ - args->new_height + 1) / 2, (args->height_ - args->new_height) / 2,
 		(args->width_ - args->new_width + 1) / 2, (args->width_ - args->new_width) / 2, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
-	m.convertTo(m, CV_32FC1);//≤ …´
+	m.convertTo(m, CV_32FC1);//ÔøΩÔøΩ…´
 	//cv::Mat cm[3];
 	//cv::split(m, cm);
 	//cv::imshow("test", m);
@@ -46,7 +51,7 @@ TagDetector::TagDetector(const wchar_t* model_path, float confidence_threshold/*
 {
 
 	assert(input_image_num <= MAX_IMAGE_NUM);
-	//…Ë∂® ‰»ÎÕº∆¨µƒ ˝¡ø£¨ µº  ‰»ÎµƒÕº∆¨–°”⁄µ»”⁄∏√÷µ
+	//ÔøΩË∂®ÔøΩÔøΩÔøΩÔøΩÕº∆¨ÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩ µÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÔøΩÕº∆¨–°ÔøΩ⁄µÔøΩÔøΩ⁄∏ÔøΩ÷µ
 	this->m_image_num = input_image_num;
 	input_shape_[0] = input_image_num;
 	output_shape_[0] = input_image_num;
@@ -80,10 +85,10 @@ int TagDetector::initial()
 int TagDetector::initial_model(const wchar_t* model_file, size_t cuda_id /*= 0*/)
 {
 	assert(model_file != nullptr);
-	session_options.SetIntraOpNumThreads(1);
+	session_options.SetIntraOpNumThreads(5);
 	session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
-	if (cuda_id>=0)
-		OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, cuda_id);
+// 	if (cuda_id >= 0)
+// 		OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, cuda_id);
 
 	//
 
@@ -118,7 +123,7 @@ void TagDetector::importMat_cpu(std::vector<cv::Mat> & srcms)
 	//importMat_args image_args[MAX_IMAGE_NUM] = { 0 };
 	size_t image_num = srcms.size() <= this->m_image_num ? srcms.size() : this->m_image_num;
 	this->m_real_input_num = image_num;
-	// #pragma omp paralle for // Õº∆¨ ˝¡øΩœ∂‡ ± π”√
+	// #pragma omp paralle for // Õº∆¨ÔøΩÔøΩÔøΩÔøΩÔøΩœ∂ÔøΩ ± πÔøΩÔøΩ
 	for (int i = 0; i < image_num; i++)
 	{
 		assert(srcms[i].channels() == CHANNEL_);
@@ -148,14 +153,14 @@ void TagDetector::importMat_cpu(std::vector<cv::Mat> & srcms)
 	for (auto && result : results)
 		result.get();
 #endif // MULTI_THREAD_INPUT
-}
+	}
 
 void TagDetector::importMat_gpu(std::vector<cv::Mat> &srcms)
 {
 
 }
 
-void TagDetector::convert_to_rrects(std::array<float, MAX_IMAGE_NUM * MAX_BOX_NUM * FEATS_PER> *src_data, 
+void TagDetector::convert_to_rrects(std::array<float, MAX_IMAGE_NUM * MAX_BOX_NUM * FEATS_PER> *src_data,
 	std::vector<std::vector<cv::RotatedRect>> & rrects, std::vector<std::vector<int>> &cls_inds)
 {
 	for (int n = 0; n < m_real_input_num; n++)
@@ -175,8 +180,8 @@ void TagDetector::convert_to_rrects(std::array<float, MAX_IMAGE_NUM * MAX_BOX_NU
 			printf("detect box %d: %f %f %f %f %f %f %f %f\n", b, pData[0], pData[1], pData[2], pData[3],
 				pData[4], pData[5], pData[6], pData[7]);
 #endif
-			if (pData[0] < 0.5) break; //≈–∂œΩ·Œ≤
-			//if (pData[1] > 0.998) continue; //µ˜ ‘
+			if (pData[0] < 0.5) break; //ÔøΩ–∂œΩÔøΩŒ≤
+			//if (pData[1] > 0.998) continue; //ÔøΩÔøΩÔøΩÔøΩ
 			if (pData[1] < this->m_confidence_threshold) continue;
 
 
@@ -196,7 +201,7 @@ void TagDetector::convert_to_rrects(std::array<float, MAX_IMAGE_NUM * MAX_BOX_NU
 		nms_multi_class(one_res, cls_, this->m_iou_threshold);
 		cv::Point2f scal_pt(shift_x[n], shift_y[n]);
 
-		//ªÿ∏¥µΩ‘≠ ºÕºœÒ≥ﬂ¥Á
+		//ÔøΩÿ∏ÔøΩÔøΩÔøΩ‘≠ ºÕºÔøΩÔøΩﬂ¥ÔøΩ
 		for (int i = 0; i < one_res.size(); i++)
 		{
 			one_res[i].center -= scal_pt;
@@ -264,14 +269,14 @@ bool sort_func_rects_by_cls(std::pair<cv::RotatedRect, int>& a, std::pair<cv::Ro
 
 void TagDetector::nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vector<int> &class_ids, float iou_threshold)
 {
-	if (rects.size()<=1)
+	if (rects.size() <= 1)
 	{
 		return;
 	}
 	std::pair<cv::RotatedRect, int> rct;
 	std::vector<std::pair<cv::RotatedRect, int>> rects_cls;
 	rects_cls.reserve(rects.size());
-	for (size_t i=0;i<rects.size();i++)
+	for (size_t i = 0; i < rects.size(); i++)
 	{
 		rct.first = rects[i];
 		rct.second = class_ids[i];
@@ -285,7 +290,7 @@ void TagDetector::nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vect
 	std::sort(rects_cls.begin(), rects_cls.end(), sort_func_rects_by_cls);
 	size_t same_cls_count = 0;
 	size_t cls = rects_cls[0].second;
-	for (size_t i=1;i<rects_cls.size()+1;i++)
+	for (size_t i = 1; i < rects_cls.size() + 1; i++)
 	{
 		if (i == rects_cls.size())
 		{
@@ -315,7 +320,7 @@ void TagDetector::nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vect
 
 		if (rects_cls[i].second != cls)
 		{
-			if (same_cls_count==0)
+			if (same_cls_count == 0)
 			{
 				rects.push_back(rects_cls[i - 1].first);
 				class_ids.push_back(cls);
@@ -324,13 +329,13 @@ void TagDetector::nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vect
 			else
 			{
 				std::vector<cv::RotatedRect> rt;
-				for (int j=i-same_cls_count-1;j<i;j++)
+				for (int j = i - same_cls_count - 1; j < i; j++)
 				{
 					rt.push_back(rects_cls[j].first);
 				}
 				nms_rotated_rect(rt, iou_threshold);
 				rects.insert(rects.end(), rt.begin(), rt.end());
-				for (int j=0;j<rt.size();j++)
+				for (int j = 0; j < rt.size(); j++)
 				{
 					class_ids.push_back(cls);
 				}
@@ -347,7 +352,7 @@ void TagDetector::nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vect
 	}
 }
 
-void TagDetector::detectParcels(std::vector<cv::Mat> &srcms, std::vector<std::vector<cv::RotatedRect>> & rrects, 
+void TagDetector::detectParcels(std::vector<cv::Mat> &srcms, std::vector<std::vector<cv::RotatedRect>> & rrects,
 	std::vector<std::vector<int>> &cls_inds)
 {
 
@@ -375,8 +380,6 @@ void TagDetector::detectParcels(std::vector<cv::Mat> &srcms, std::vector<std::ve
 
 #endif // DEBUG_ONNX_EFFICIENTDET_R0
 
-
-
 }
 
 OCRStandardTag::OCRStandardTag()
@@ -386,35 +389,71 @@ OCRStandardTag::OCRStandardTag()
 
 std::string OCRStandardTag::get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_config *pConfig)
 {
+	log_str = "";
+	if (tag_mat.empty())
+	{
+		log_str += "src image is empty,";
+		return "";
+	}
+	if (tag_mat.cols<50||tag_mat.rows<50)
+	{
+		log_str += "src image width or height is too small,";
+		return "";
+	}
+
+
 	string postcodestr;
 	cv::Rect rt(tag_mat.cols/2,0,tag_mat.cols/2,tag_mat.rows/2);
-	cv::Mat rtmat = tag_mat(rt);
+	cv::Mat rtmat;
+	tag_mat(rt).copyTo(rtmat);
 	//cv::Mat match_linemat = cv::imread("E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg");
 	cv::Mat textrange_mat;
-	locate_text_range(rtmat, textrange_mat, pConfig); //∂®Œª”“…œΩ«Œƒ◊÷«¯”Ú
-	if (textrange_mat.empty())
+	int res = locate_text_range(rtmat, textrange_mat, pConfig); //ÂÆö‰ΩçÂè≥‰∏äËßíÊñáÂ≠óÂå∫Âüü
+	if (res==0 || textrange_mat.empty())
+	{
+		log_str += "do not locate text range,";
 		return postcodestr;
+	}
 	cv::Mat post_code_line;
-	get_postcode_line(textrange_mat, post_code_line); // ∂®Œª” ±‡––
+	res = get_postcode_line(textrange_mat, post_code_line); // ÂÆö‰ΩçÈÇÆÁºñË°å
+	if (!res)
+	{
+		res = get_postcode_line(rtmat, post_code_line); //Â¶ÇÊûúÂÆö‰ΩçÈÇÆÁºñÂõõÁôæÔºåÂàô‰ΩøÁî®Êú™ÁªèËøáÊóãËΩ¨ÁöÑÂõæÁâáÂÜçÊ¨°ÂÆö‰Ωç„ÄÇ
+	}
 	if (!post_code_line.empty())
 	{
 		_run_ocr(post_code_line, postcodestr, pConfig);
-		format_postcode(postcodestr);
+		format_postcode(postcodestr,pConfig);
 	}
 	return postcodestr;
 }
 
 
+std::string OCRStandardTag::get_last_log()
+{
+	return log_str;
+}
+
 int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 {
-	cv::Mat roiMat = srcm;
-	if (srcm.channels() == 3)
-		cvtColor(srcm, roiMat, COLOR_BGR2GRAY);
+	if (srcm.empty())
+	{
+		log_str += "get post line image is empty";
+		return 0;
+	}
+	cv::Mat roiMat;
+	srcm.copyTo(roiMat);
+	if (roiMat.channels() == 3)
+		cvtColor(roiMat, roiMat, COLOR_BGR2GRAY);
 
 	float scal_ = 150.0 / roiMat.rows;
 	cv::resize(roiMat, roiMat, cv::Size(), scal_, scal_);
 
 	int g_width = roiMat.cols;
+
+
+	cv::normalize(roiMat, roiMat, 255, 0, cv::NORM_MINMAX);
+
 
 	cv::Rect adjr = cv::Rect(0, roiMat.rows / 2, roiMat.cols, roiMat.rows / 2);
 	float pix = ImageProcessFunc::getAveragePixelInRect(roiMat, adjr);
@@ -425,9 +464,9 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 	//cv::GaussianBlur(roiMat, g_img, cv::Size(3, 3), 0);
 	cv::Canny(g_img, g_img, 20, 150);
 
-#ifdef POSTCODE_ROI_DEBUG
-	cv::imshow("canny¥¶¿ÌΩ·π˚", g_img);
-#endif // POSTCODE_ROI_DEBUG
+#ifdef DEBUG_STD_TAG
+	cv::imshow("cannyÂ§ÑÁêÜÁªìÊûú", g_img);
+#endif // DEBUG_STD_TAG
 
 	threshold(g_img, g_img, 30, 255, THRESH_BINARY);
 	//bitwise_not(g_img, g_img);
@@ -438,12 +477,12 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 	g_img = g_img.clone();
 
 
-#ifdef POSTCODE_ROI_DEBUG
-	imshow("–ŒÃ¨—ß¥¶¿Ì«∞ÕºœÒ", g_img);
-#endif // POSTCODE_ROI_DEBUG
+#ifdef DEBUG_STD_TAG
+	imshow("ÂΩ¢ÊÄÅÂ≠¶Â§ÑÁêÜÂâçÂõæÂÉè", g_img);
+#endif // DEBUG_STD_TAG
 
 
-	//–ŒÃ¨—ß‘ÀÀ„
+	//ÂΩ¢ÊÄÅÂ≠¶ËøêÁÆó
 	Mat element = getStructuringElement(MORPH_RECT, Size(30, 1));
 	morphologyEx(g_img, g_img, MORPH_CLOSE, element);
 
@@ -454,21 +493,22 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 	morphologyEx(g_img, g_img, MORPH_OPEN, element);
 
 
-#ifdef POSTCODE_ROI_DEBUG
-	imshow("–ŒÃ¨—ß¥¶¿Ì∫ÛÕºœÒ", g_img);
-#endif // POSTCODE_ROI_DEBUG
+#ifdef DEBUG_STD_TAG
+	imshow("ÂΩ¢ÊÄÅÂ≠¶Â§ÑÁêÜÂêéÂõæÂÉè", g_img);
+#endif // DEBUG_STD_TAG
 	//
 	//waitKey(0);
 
 
-	//Àı–°Õ≥º∆«¯”Ú
-	g_img = g_img(Rect(g_img.cols / 3, 0, g_img.cols * 2 / 3, g_img.rows));
+	//Áº©Â∞èÁªüËÆ°Âå∫Âüü
+	cv::Mat summat;
+	g_img(Rect(g_img.cols / 3, 0, g_img.cols * 2 / 3, g_img.rows)).copyTo(summat);
 
-	// º∆À„ø…ƒ‹∞¸∫¨Œƒ◊÷µƒ––
+	// ËÆ°ÁÆóÂèØËÉΩÂåÖÂê´ÊñáÂ≠óÁöÑË°å
 	vector<unsigned int>PixelsAdd;
-	ImageProcessFunc::sumPixels(g_img, 0, PixelsAdd);
+	ImageProcessFunc::sumPixels(summat, 0, PixelsAdd);
 
-	//Ω´
+	//Â∞Ü
 	unsigned int max_pixes = 0;
 	int isolate_count = 0;
 	bool is_continue = false;
@@ -496,12 +536,13 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 
 	}
 
-	// ¡™Õ®∂Ã‘›µƒ≤ª¡¨–¯«¯”Ú
+	// ËÅîÈÄöÁü≠ÊöÇÁöÑ‰∏çËøûÁª≠Âå∫Âüü
 	if (bars_vec.size() == 0)
 	{
-#ifdef POSTCODE_ROI_DEBUG
-		printf("Œ¥’“µΩ◊÷∑˚––\n");
-#endif // POSTCODE_ROI_DEBUG
+		log_str += "num of text line exception,";
+#ifdef DEBUG_STD_TAG
+		printf("Êú™ÊâæÂà∞Â≠óÁ¨¶Ë°å\n");
+#endif // DEBUG_STD_TAG
 		return 0;
 	}
 	//Point pre_pt = bars_vec[0];
@@ -523,14 +564,15 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 	}
 	if (bars_vec.size() == 0)
 	{
-#ifdef POSTCODE_ROI_DEBUG
-		printf("¡™Õ®◊÷∑˚––∫Û£¨Œ¥’“µΩ◊÷∑˚––\n");
-#endif // POSTCODE_ROI_DEBUG
+		log_str += "num of text line exception,";
+#ifdef DEBUG_STD_TAG
+		printf("ËÅîÈÄöÂ≠óÁ¨¶Ë°åÂêéÔºåÊú™ÊâæÂà∞Â≠óÁ¨¶Ë°å\n");
+#endif // DEBUG_STD_TAG
 		return 0;
 	}
 
 
-	// …æ≥˝≤ª¡¨–¯––«¯”Ú£¨»Áπ˚«¯”Ú∏ﬂ–°”⁄3£¨’ﬂ…æ≥˝÷Æ
+	// Âà†Èô§‰∏çËøûÁª≠Ë°åÂå∫ÂüüÔºåÂ¶ÇÊûúÂå∫ÂüüÈ´òÂ∞è‰∫é3ÔºåËÄÖÂà†Èô§‰πã
 	for (it = bars_vec.begin(); it != bars_vec.end(); )
 	{
 		if (it->y - it->x < 3)
@@ -545,13 +587,14 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 
 	if (bars_vec.size() == 0)
 	{
-#ifdef POSTCODE_ROI_DEBUG
-		printf("Œ¥’“µΩ◊÷∑˚––\n");
-#endif // POSTCODE_ROI_DEBUG
+		log_str += "num of text line exception,";
+#ifdef DEBUG_STD_TAG
+		printf("Êú™ÊâæÂà∞Â≠óÁ¨¶Ë°å\n");
+#endif // DEBUG_STD_TAG
 		return 0;
 	}
 
-	// …æ≥˝∏…»≈«¯”Ú£¨»Áπ˚œ¬“ª∏ˆ«¯”ÚŒª÷√≥¨π˝±æ«¯”Ú∏ﬂµƒ¡Ω±∂£¨»œŒ™≤ª «’˝»∑«¯”Ú
+	// Âà†Èô§Âπ≤Êâ∞Âå∫ÂüüÔºåÂ¶ÇÊûú‰∏ã‰∏Ä‰∏™Âå∫Âüü‰ΩçÁΩÆË∂ÖËøáÊú¨Âå∫ÂüüÈ´òÁöÑ‰∏§ÂÄçÔºåËÆ§‰∏∫‰∏çÊòØÊ≠£Á°ÆÂå∫Âüü
 	pre_it = bars_vec.begin();
 //	for (it = bars_vec.begin() + 1; it != bars_vec.end();)
 //	{
@@ -575,32 +618,33 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 //	}
 	if (bars_vec.size() < 3)
 	{
-#ifdef POSTCODE_ROI_DEBUG
-		printf("◊÷∑˚––≤ª’˝»∑\n");
-#endif // POSTCODE_ROI_DEBUG
+		log_str += "num of text line exception,";
+#ifdef DEBUG_STD_TAG
+		printf("Â≠óÁ¨¶Ë°å‰∏çÊ≠£Á°Æ\n");
+#endif // DEBUG_STD_TAG
 		return 0;
 	}
 
-	//≈–∂œ «∑Ò≥ˆœ÷¡Ω––’≥¡¨
+	//Âà§Êñ≠ÊòØÂê¶Âá∫Áé∞‰∏§Ë°åÁ≤òËøû
 	vector<int> bars_pos_y_vec;
 	for (int i = 0; i < 3; i++)
 	{
 		bars_pos_y_vec.push_back(bars_vec[i].y - bars_vec[i].x);
-		cout << "bars " << i << " pos:" << bars_pos_y_vec[i] << endl;
+		//cout << "bars " << i << " pos:" << bars_pos_y_vec[i] << endl;
 	}
 	std::sort(bars_pos_y_vec.begin(), bars_pos_y_vec.end());
 
 //	if (bars_pos_y_vec[2] >= 2 * bars_pos_y_vec[0])
 //	{
-//#ifdef POSTCODE_ROI_DEBUG
-//		printf("≥ˆœ÷––’≥¡¨\n");
-//#endif // POSTCODE_ROI_DEBUG
+//#ifdef DEBUG_STD_TAG
+//		printf("Âá∫Áé∞Ë°åÁ≤òËøû\n");
+//#endif // DEBUG_STD_TAG
 //		return 0;
 //	}
 //
 
 
-	// »∑∂®” ±‡––«¯”Ú
+	// Á°ÆÂÆöÈÇÆÁºñË°åÂå∫Âüü
 	int bar_pos = (bars_vec[2].x + bars_vec[2].y) / 2;
 	int bar_width = bars_vec[2].y - bars_vec[2].x;
 
@@ -610,9 +654,10 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 	//cv::rectangle(roiMat, Rec_postcode, Scalar(255, 255, 255), 2);
 	if (postcode_y + postcode_h >= srcm.rows)
 	{
-#ifdef POSTCODE_ROI_DEBUG
-		printf("” ±‡∂®Œª≥¨≥ˆΩÁœﬁ\n");
-#endif // POSTCODE_ROI_DEBUG
+		log_str += "text line location out of range";
+#ifdef DEBUG_STD_TAG
+		printf("ÈÇÆÁºñÂÆö‰ΩçË∂ÖÂá∫ÁïåÈôê\n");
+#endif // DEBUG_STD_TAG
 		return 0;
 	}
 	Rec_postcode.x = Rec_postcode.x / scal_;
@@ -621,20 +666,25 @@ int OCRStandardTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
 	Rec_postcode.height = Rec_postcode.height / scal_;
 	ImageProcessFunc::CropRect(cv::Rect(0,0,srcm.cols,srcm.rows), Rec_postcode);
 
-	dstm = srcm(Rec_postcode).clone();
+	srcm(Rec_postcode).copyTo(dstm);
 
 	return 1;
 }
 
 int OCRStandardTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAlgorithm_config *pConfig)
 {
-	if (post_code_line.empty()) return 0;
-	Mat srcm = post_code_line;
+	if (post_code_line.empty())
+	{
+		log_str += "post code line is empty,";
+		return 0;
+	}
+	Mat srcm;
+	post_code_line.copyTo(srcm);
 	if (srcm.channels() == 3)
 	{
 		cv::cvtColor(srcm, srcm, COLOR_BGR2GRAY);
 	}
-	///////////// ‘§¥¶¿Ì
+	///////////// È¢ÑÂ§ÑÁêÜ
 	int h = srcm.rows;
 	int sh = 20;
 	float scal_ = sh / float(h);
@@ -645,7 +695,7 @@ int OCRStandardTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	}
 	else
 	{
-		resizedMat = srcm.clone();
+		srcm.copyTo(resizedMat);
 	}
 
 	cv::Rect mR;
@@ -653,7 +703,9 @@ int OCRStandardTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	mR.y = resizedMat.rows/2;
 	mR.height = resizedMat.rows/2;
 	mR.width = resizedMat.cols / 2;
-	
+	cv::normalize(resizedMat, resizedMat, 255, 0, cv::NORM_MINMAX);
+
+
 
 	double vPix = ImageProcessFunc::getAveragePixelInRect(resizedMat, mR);
 	double anchor = 120;
@@ -662,8 +714,8 @@ int OCRStandardTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	ImageProcessFunc::adJustBrightness(resizedMat, alpha, beta, anchor);
 
 	//cv::threshold(resizedMat, resizedMat, vPix*0.6, 255, cv::THRESH_BINARY);
-#ifdef POSTCODE_ROI_DEBUG
-	imshow("_runOcrµ˜’˚¡¡∂»∫Û", resizedMat);
+#ifdef DEBUG_STD_TAG
+	imshow("_runOcrË∞ÉÊï¥‰∫ÆÂ∫¶Âêé", resizedMat);
 #endif // OCR_DEBUG
 	int w = resizedMat.cols;
 	h = resizedMat.rows;
@@ -674,6 +726,7 @@ int OCRStandardTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	tesseract::TessBaseAPI* pTess = (tesseract::TessBaseAPI*)pConfig->pTessEn;
 	if (pTess ==NULL)
 	{
+		log_str += "tesseract engine is Null,";
 		return 0;
 	}
 	pTess->SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_LINE);
@@ -683,17 +736,16 @@ int OCRStandardTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	pTess->Recognize(0);
 
 	// get result and delete[] returned char* string
-#ifdef OCR_DEBUG
+#ifdef DEBUG_STD_TAG
 	std::cout << std::unique_ptr<char[]>(pTess->GetUTF8Text()).get() << std::endl;
 #endif // OCR_DEBUG
 	//
-	char tmp[512] = { 0 };
+	
 	char *res_data = pTess->GetUTF8Text();
-	strcpy_s(tmp, 512, res_data);
+	size_t max_len = 512;
+	size_t str_len = std::min(max_len, strlen(res_data));
+	results = std::string(res_data, str_len);
 	delete[] res_data;
-	results = tmp;
-
-
 
 	return 1;
 }
@@ -703,41 +755,42 @@ int OCRStandardTag::locate_text_range(cv::Mat srcm,cv::Mat &dstm, OcrAlgorithm_c
 	const int MAX_KEYPOINTS = 50;
 	using namespace cv;
 	using namespace std;
-	using namespace cv::xfeatures2d;
+	//using namespace cv::;
 
-	 //≤ŒøºµƒÕºœÒøÌ∏ﬂ°£
-
+	 //ÂèÇËÄÉÁöÑÂõæÂÉèÂÆΩÈ´ò„ÄÇ
+	cv::Mat mcp;
+	srcm.copyTo(mcp);
 	//cv::Mat im2Gray = match_m;
 
-	if (srcm.channels() == 3)
-		cv::cvtColor(srcm, srcm, COLOR_BGR2GRAY);
+	if (mcp.channels() == 3)
+		cv::cvtColor(mcp, mcp, COLOR_BGR2GRAY);
 	//if (match_m.channels() == 3)
 	//	cv::cvtColor(match_m, im2Gray, COLOR_BGR2GRAY);
 	
-	float scal = 200.0/ srcm.rows;
-	cv::resize(srcm, srcm, cv::Size(), scal, scal);
+	float scal = 200.0/ mcp.rows;
+	cv::resize(mcp, mcp, cv::Size(), scal, scal);
 
 	//scal = 50.0 / im2Gray.rows;
 	//cv::resize(im2Gray, im2Gray, cv::Size(), scal, scal);
 
 	cv::Mat im1Gray;
-	cv::blur(srcm, im1Gray, cv::Size(3,3));
+	cv::blur(mcp, im1Gray, cv::Size(3,3));
 	//cv::GaussianBlur(srcm, im1Gray, cv::Size(3, 3), 0);
 
-	cv::Rect adjr = cv::Rect(0, im1Gray.rows / 2, im1Gray.cols, im1Gray.rows / 2);
-	float pix = ImageProcessFunc::getAveragePixelInRect(im1Gray, adjr);
-	ImageProcessFunc::adJustBrightness(im1Gray, 1.3, 120 - pix, pix*0.5);
+	cv::normalize(im1Gray, im1Gray, 255, 0, cv::NORM_MINMAX);
+	
+// 	cv::Rect adjr = cv::Rect(0, im1Gray.rows / 2, im1Gray.cols, im1Gray.rows / 2);
+// 	float pix = ImageProcessFunc::getAveragePixelInRect(im1Gray, adjr);
+//  ImageProcessFunc::adJustBrightness(im1Gray, 1.3, 120 - pix, pix*0.5);
 
 
 
-#ifdef POSTCODE_ROI_DEBUG
+#ifdef DEBUG_STD_TAG
 	cv::imshow("tagsrc", im1Gray);
 	//Mat result;
-	//drawMatches(im1Gray, n_keypoints1, im2Gray, n_keypoints2, matches, result, Scalar(0, 255, 0), Scalar::all(-1));//∆•≈‰Ãÿ’˜µ„¬Ã…´£¨µ•“ªÃÿ’˜µ„—’…´ÀÊª˙
+	//drawMatches(im1Gray, n_keypoints1, im2Gray, n_keypoints2, matches, result, Scalar(0, 255, 0), Scalar::all(-1));//ÂåπÈÖçÁâπÂæÅÁÇπÁªøËâ≤ÔºåÂçï‰∏ÄÁâπÂæÅÁÇπÈ¢úËâ≤ÈöèÊú∫
 	//imshow("Match_Result", result);
-#endif // POSTCODE_ROI_DEBUG
-
-
+#endif // DEBUG_STD_TAG
 
 
 
@@ -746,15 +799,20 @@ int OCRStandardTag::locate_text_range(cv::Mat srcm,cv::Mat &dstm, OcrAlgorithm_c
 
 	std::vector<KeyPoint> keypoints1, keypoints2;
 	cv::Mat descriptors1, descriptors2;
-	cv::Ptr<Feature2D> sift1 = cv::xfeatures2d::SIFT::create(MAX_KEYPOINTS*4);
+	cv::Ptr<Feature2D> sift1 = cv::SIFT::create(MAX_KEYPOINTS*4);
 	//cv::Ptr<Feature2D> sift2 = cv::xfeatures2d::SIFT::create(MAX_KEYPOINTS);
 	sift1->detectAndCompute(im1Gray, Mat(), keypoints1, descriptors1);
+	if (keypoints1.empty() || descriptors1.empty())
+	{
+		log_str += "sift key points empty, ";
+		return 0;
+	}
 	//sift2->detectAndCompute(im2Gray, Mat(), keypoints2, descriptors2);
 
 	keypoints2 = pConfig->match_data.keypoints_tag_line;
 	descriptors2 = pConfig->match_data.descriptors_tag_line;
 
-	//µ˜ ‘”√
+	//Ë∞ÉËØïÁî®
 	//Mat img_keypoints_1, img_keypoints_2;
 	//cv::drawKeypoints(im1Gray, keypoints1, img_keypoints_1, Scalar::all(-1));
 	//cv::drawKeypoints(im2Gray, keypoints2, img_keypoints_2, Scalar::all(-1));
@@ -767,10 +825,40 @@ int OCRStandardTag::locate_text_range(cv::Mat srcm,cv::Mat &dstm, OcrAlgorithm_c
 	cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create("BruteForce");
 	matcher->match(descriptors2, descriptors1, matches, Mat());
 
-	//Ãﬁ≥˝≤ª∆•≈‰µƒkeypoint
+	if (matches.empty())
+	{
+		log_str += "sift matched points is empty,";
+#ifdef DEBUG_STD_TAG
+		cout << "ÂåπÈÖçÁÇπÊï∞Â∞è‰∫é4" << endl;
+#endif // DEBUG_STD_TAG
+		return 0;
+	}
+
+	if (matches.size() < 4)
+	{
+		log_str += "sift matched points num is lower than 4,";
+#ifdef DEBUG_STD_TAG
+		cout << "ÂåπÈÖçÁÇπÊï∞Â∞è‰∫é4" << endl;
+#endif // DEBUG_STD_TAG
+		return 0;
+	}
+
+
+
+
+	//ÂâîÈô§‰∏çÂåπÈÖçÁöÑkeypoint
 	float keypoint_percent = 0.6;
-	nth_element(matches.begin(), matches.begin() + int(MAX_KEYPOINTS*keypoint_percent), matches.end());   //Ã·»°≥ˆ«∞30∏ˆ◊Óº—∆•≈‰Ω·π˚     
-	matches.erase(matches.begin() + int(MAX_KEYPOINTS*keypoint_percent)+1, matches.end());    //Ãﬁ≥˝µÙ∆‰”‡µƒ∆•≈‰Ω·π˚
+	int valid_num_kpt = int(MAX_KEYPOINTS*keypoint_percent);
+
+	if (matches.size()>valid_num_kpt)
+	{
+		nth_element(matches.begin(), matches.begin() + int(MAX_KEYPOINTS*keypoint_percent), matches.end());
+		matches.erase(matches.begin() + valid_num_kpt, matches.end());
+	}
+
+	
+	
+	   //ÂâîÈô§ÊéâÂÖ∂‰ΩôÁöÑÂåπÈÖçÁªìÊûú
 	std::vector<KeyPoint> n_keypoints1, n_keypoints2;
 
 	int ind = 0;
@@ -788,20 +876,21 @@ int OCRStandardTag::locate_text_range(cv::Mat srcm,cv::Mat &dstm, OcrAlgorithm_c
 		matches.erase(matches.begin() + ind, matches.end());
 
 
-	if (matches.size() < 3)
+	if (matches.size() < 4)
 	{
-#ifdef POSTCODE_ROI_DEBUG
-		cout << "∆•≈‰µ„ ˝–°”⁄3" << endl;
-#endif // POSTCODE_ROI_DEBUG
+		log_str += "sift matched points num is lower than 4,";
+#ifdef DEBUG_STD_TAG
+		cout << "ÂåπÈÖçÁÇπÊï∞Â∞è‰∫é4" << endl;
+#endif // DEBUG_STD_TAG
 		return 0;
 	}
 
 
-#ifdef POSTCODE_ROI_DEBUG
+#ifdef DEBUG_STD_TAG
 	//Mat result;
-	//drawMatches(im1Gray, n_keypoints1, im2Gray, n_keypoints2, matches, result, Scalar(0, 255, 0), Scalar::all(-1));//∆•≈‰Ãÿ’˜µ„¬Ã…´£¨µ•“ªÃÿ’˜µ„—’…´ÀÊª˙
+	//drawMatches(im1Gray, n_keypoints1, im2Gray, n_keypoints2, matches, result, Scalar(0, 255, 0), Scalar::all(-1));//ÂåπÈÖçÁâπÂæÅÁÇπÁªøËâ≤ÔºåÂçï‰∏ÄÁâπÂæÅÁÇπÈ¢úËâ≤ÈöèÊú∫
 	//imshow("Match_Result", result);
-#endif // POSTCODE_ROI_DEBUG
+#endif // DEBUG_STD_TAG
 
 	
 
@@ -811,25 +900,37 @@ int OCRStandardTag::locate_text_range(cv::Mat srcm,cv::Mat &dstm, OcrAlgorithm_c
 		points_1.push_back(n_keypoints1[matches[i].trainIdx].pt);
 		points_ref.push_back(n_keypoints2[matches[i].queryIdx].pt);
 	}
-
 	Mat h1 = cv::findHomography(points_1, points_ref, cv::RANSAC);
-	cv::warpPerspective(srcm, dstm, h1, refSize);
+	if (h1.empty())
+	{
+		log_str += "not find homography mat, ";
+		return 0;
+	}
 
+	//std::cout << "h1:" << cv::format(h1, cv::Formatter::FMT_NUMPY) << std::endl;
+	cv::warpPerspective(mcp, dstm, h1, refSize);
 
-#ifdef POSTCODE_ROI_DEBUG
+	if (dstm.empty())
+	{
+		log_str += "warpPerspective image output empty";
+		return 0;
+	}
+// 	cv::imshow("src", srcm);
+// 	cv::imshow("dst", dstm);
+// 	cv::waitKey(0);
+
+#ifdef DEBUG_STD_TAG
 	cv::imshow("dstimg", dstm);
-#endif // POSTCODE_ROI_DEBUG
+#endif // DEBUG_STD_TAG
 	return 1;
-
-
 
 }
 
-int OCRStandardTag::format_postcode(std::string &str)
+int OCRStandardTag::format_postcode(std::string &str, OcrAlgorithm_config *pConfig)
 {
 
 	string results;
-	double score = postcodeStringScore(str, results);
+	double score = postcodeStringScore(str, results,pConfig);
 
 	if (score>0.5)
 	{
@@ -837,6 +938,7 @@ int OCRStandardTag::format_postcode(std::string &str)
 	}
 	else
 	{
+		log_str += "digits score is lower than 0.5";
 		str = "";
 	}
 	return 1;
@@ -847,10 +949,10 @@ double OCRStandardTag::continuousDigitsScore(std::string srcStr, int continus_nu
 	if (continus_num <= 0) return 0.0;
 	if (srcStr.empty()) return 0.0;
 
-	for (int i = 0; i < srcStr.length();)//Ãﬁ≥˝ø’∏Ò
+	for (int i = 0; i < srcStr.length();)//ÂâîÈô§Á©∫Ê†º
 	{
 		unsigned char c = srcStr.at(i);
-		if (c == ' ' || c == '-')
+		if (c == ' ')
 		{
 			srcStr.erase(i, 1);
 		}
@@ -866,17 +968,15 @@ double OCRStandardTag::continuousDigitsScore(std::string srcStr, int continus_nu
 
 	if (m_continues_num < continus_num) return 0.0;
 
-	///Œ™¡¨–¯ ˝◊÷µƒ÷ ¡ø¥Ú∑÷
+	///‰∏∫ËøûÁª≠Êï∞Â≠óÁöÑË¥®ÈáèÊâìÂàÜ
 	double conti_socre = 1.0 - (m_continues_num - continus_num) / double(continus_num);
 	conti_socre = max(conti_socre, 0.0);
 
-
-	///Œ™◊÷∑˚¥Æ≥§∂»¥Ú∑÷
-
-	double length_socre = 1.0 - (src_length - continus_num) / (1.2*double(continus_num));//∂‘∑÷ ˝µƒ”∞œÏ¥Ú’€
+	///‰∏∫Â≠óÁ¨¶‰∏≤ÈïøÂ∫¶ÊâìÂàÜ
+	double length_socre = 1.0 - (src_length - continus_num) / (1.2*double(continus_num));//ÂØπÂàÜÊï∞ÁöÑÂΩ±ÂìçÊâìÊäò
 	length_socre = max(length_socre, 0.0);
 
-	//∑µªÿ∏¥∫œ∑÷ ˝
+	//ËøîÂõûÂ§çÂêàÂàÜÊï∞
 	return conti_socre * length_socre;
 
 }
@@ -949,40 +1049,90 @@ size_t OCRStandardTag::getFirstContinuousDigits(std::string srcStr, int conti_nu
 	}
 	return 0;
 }
-double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resultStr)
+double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resultStr, OcrAlgorithm_config *pConfig)
 {
 	//////////////////////////////////////////////////////////////////////////
-//∏˘æ›–≠“È…Ë∂®
-	const int length_left = 5;
-	const int length_right_4 = 4;
-	const int length_right_5 = 5;
-	if (srcStr.size() < length_left) return 0;
+//Ê†πÊçÆËÆæÂÆö
+	bool strict_mode = 0;
+	bool support_code_num_4 = 1;
+	bool support_code_num_10 = 0;
+	int std_postcoce_num = 5;
 
-	double whole_score = 0;
-	///»•≥˝ø’∏Ò
-	for (int i = 0; i < srcStr.length();)//Ãﬁ≥˝ø’∏Ò
+	if (srcStr.size()<std_postcoce_num)
 	{
-		unsigned char c = srcStr.at(i);
-		if (c == ' ')
-		{
-			srcStr.erase(i, 1);
-		}
-		else
-		{
-			i++;
-		}
+		log_str += "post code length is lower than 4";
+		return 0;
 	}
 
 
+
+	if (pConfig)
+	{
+		strict_mode = pConfig->strict_mode;
+		support_code_num_10 = pConfig->support_postcode_10;
+		support_code_num_4 = pConfig->support_postcode_4;
+		std_postcoce_num = pConfig->std_postcode_num;
+	}
+	support_code_num_4 = strict_mode ? 0 : support_code_num_4;
+
+
+	int length_left = std_postcoce_num;
+	int length_right_4 = 4;
+	int length_right_5 = std_postcoce_num;
+	if (srcStr.size() < length_left) return 0;
+
+	double whole_score = 0;
+	///ÂéªÈô§Á©∫Ê†º
+	if (!strict_mode)
+	{
+		for (int i = 0; i < srcStr.length();)//ÂâîÈô§Á©∫Ê†º
+		{
+			unsigned char c = srcStr.at(i);
+			if (c == ' ' || c == '\n')
+			{
+				srcStr.erase(i, 1);
+			}
+			else
+			{
+				i++;
+			}
+		}
+	}
+
+	if (strict_mode)
+	{
+		size_t _pos = srcStr.find('-');
+		if (_pos != srcStr.npos)
+		{
+			std::string substr1 = srcStr.substr(0, _pos);
+			std::string substr2 = srcStr.substr(_pos + 1);
+			int num = maxNumContinuousDigits(substr1);
+			if (num != std_postcoce_num) return 0;
+			num = maxNumContinuousDigits(substr2);
+			if (num != std_postcoce_num) return 0;
+			return getFirstContinuousDigits(substr2, std_postcoce_num, resultStr);
+		}
+		else
+		{
+			if (support_code_num_10)
+			{
+				int num = maxNumContinuousDigits(srcStr);
+				if (num==10)
+				{
+					return getFirstContinuousDigits(srcStr, 10, resultStr);
+				}
+			}
+			return 0;
+		}
+	}
+
 	//////////////////////////////////////////////////////////////////////////
-//”–°∞-°±µƒ«Èøˆ 5+5,5+4µƒ«Èøˆ,
+//Êúâ‚Äú-‚ÄùÁöÑÊÉÖÂÜµ 5+5,5+4ÁöÑÊÉÖÂÜµ,
 	size_t _pos = srcStr.find('-');
 	if (_pos != srcStr.npos)
 	{
-		//≈–∂œ-∫≈Œª÷√£¨
-		float div_pos_score = (fabs(_pos - srcStr.size() / 2.0)) / srcStr.size() * 2.0;//‘ºÕ˘÷–º‰µ√∑÷‘ΩµÕ(0-1)
-		//if (div_pos_score < 0.75)//-∫≈‘⁄÷–º‰
-		//{
+		//Âà§Êñ≠-Âè∑‰ΩçÁΩÆÔºå
+
 		std::string substr1 = srcStr.substr(0, _pos);
 		std::string substr2 = srcStr.substr(_pos + 1);
 
@@ -991,71 +1141,35 @@ double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resu
 		std::string resStr1, resStr2;
 		getFirstContinuousDigits(substr1, length_left, resStr1);
 
-		double score_right_5 = continuousDigitsScore(substr2, length_right_5);
-		double score_right_4 = continuousDigitsScore(substr2, length_right_4);
+		double score_right_5 = continuousDigitsScore(substr2, length_right_5); 
+		double score_right_4 = 0;
+		if (support_code_num_4)
+		{
+			score_right_4 = continuousDigitsScore(substr2, length_right_4);
+		}
+		
 		double score_right = max(score_right_5, score_right_4);
 		int max_length_ = (score_right_5 < score_right_4) ? length_right_4 : length_right_5;
 		getFirstContinuousDigits(substr2, max_length_, resStr2);
-		resultStr = resStr1 + resStr2;
+		resultStr = resStr1 +"-"+ resStr2;
+
 		whole_score = score_left * score_right;
 
 		return whole_score;
 		//}
 	}
 
-	//////////////////////////////////////////////////////////////////////////
-	//√ª”–’“µΩ’˝»∑µƒ-∫≈µƒ«Èøˆ
-	//for (int i = 0; i < srcStr.length();)//Ãﬁ≥˝ø’∏Ò
-	//{
-	//	unsigned char c = srcStr.at(i);
-	//	if (c == '-')
-	//	{
-	//		srcStr.erase(i, 1);
-	//	}
-	//	else
-	//	{
-	//		i++;
-	//	}
-	//}
-
-	// «∑Òøº¬«-±ª ∂±Œ™ø’∏Òµƒ«Èøˆ°£°£°£
-	double score_l_r5 = continuousDigitsScore(srcStr, length_left + length_right_5);
-	double score_l_r4 = continuousDigitsScore(srcStr, length_left + length_right_4);
-	double score_r5 = 0;// continuousDigitsScore(srcStr, length_right_5); //÷ª ∂±µΩ5ŒªµƒΩ´æ‹ ∂
-
-	int max_i = 0;
-	if (score_l_r4 > score_l_r5)
+	//ÊòØÂê¶ËÄÉËôë-Ë¢´ËØÜÂà´‰∏∫Á©∫Ê†ºÁöÑÊÉÖÂÜµ,ËøôÁßçÊÉÖÂÜµÂè™ÂÖÅËÆ∏ËøûÁª≠10‰∏™Êï∞Â≠ó
+	double score_full_10 = continuousDigitsScore(srcStr, length_left + length_right_5);
+	if (score_full_10 > 0.8)
 	{
-		if (score_l_r4 >= score_r5)
+		int res = getFirstContinuousDigits(srcStr, length_left + length_right_5, resultStr);
+		if (res)
 		{
-			getFirstContinuousDigits(srcStr, length_left + length_right_4, resultStr);
-			whole_score = score_l_r4;
-
-		}
-		else
-		{
-			getFirstContinuousDigits(srcStr, length_right_5, resultStr);
-			whole_score = score_r5;
+			whole_score = score_full_10;
 		}
 	}
-	else
-	{
-		if (score_l_r5 >= score_r5)
-		{
-			getFirstContinuousDigits(srcStr, length_left + length_right_5, resultStr);
-			whole_score = score_l_r5;
-
-		}
-		else
-		{
-			getFirstContinuousDigits(srcStr, length_right_5, resultStr);
-			whole_score = score_r5;
-		}
-	}
-
-
 	return whole_score;
-
 }
 
 
@@ -1079,7 +1193,7 @@ int MatchDataStruct::getMatchDataFromImg_tag_line(const std::string &refImg1)
 	}
 
 	// Detect ORB features and compute descriptors.
-	cv::Ptr<Feature2D> sift1 = cv::xfeatures2d::SIFT::create(MAX_KEYPOINTS);
+	cv::Ptr<Feature2D> sift1 = cv::SIFT::create(MAX_KEYPOINTS);
 
 	sift1->detectAndCompute(im2Gray, Mat(), keypoints_tag_line, descriptors_tag_line);
 
@@ -1093,66 +1207,80 @@ OCRArbitaryTag::OCRArbitaryTag()
 
 std::string OCRArbitaryTag::get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_config *pConfig)
 {
-	string results;
-	_run_ocr(tag_mat, results, pConfig);
-	results = format_results(results);
-	return results;
+	log_str = "";
+	m_results = "";
+	if (tag_mat.empty())
+	{
+		log_str += "src image is empty,";
+		return "";
+	}
+	
+	_run_ocr(tag_mat, m_results, pConfig);
+
+	return format_results(m_results);
+}
+
+
+std::string OCRArbitaryTag::get_last_log()
+{
+	return log_str;
+}
+
+std::string OCRArbitaryTag::get_last_full_ocr_data()
+{
+	return m_results;
 }
 
 int OCRArbitaryTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAlgorithm_config *pConfig)
 {
-	if (post_code_line.empty()) return 0;
-	Mat srcm = post_code_line;
+	if (post_code_line.empty())
+	{
+		log_str += "tag mat is empty, ";
+		return 0;
+	}
+
+
+	Mat srcm;
+	post_code_line.copyTo(srcm);
 	if (srcm.channels() == 3)
 	{
 		cv::cvtColor(srcm, srcm, COLOR_BGR2GRAY);
 	}
-	///////////// ‘§¥¶¿Ì
-	cv::Mat resizedMat = srcm.clone();
-	//int h = srcm.rows;
-	//int sh = 20;
-	//float scal_ = sh / float(h);
-	//cv::Mat resizedMat;
-	//if (scal_ > 1.1)
-	//{
-	//	cv::resize(srcm, resizedMat, cv::Size(), scal_, scal_, cv::INTER_AREA);
-	//}
-	//else
-	//{
-	//	resizedMat = srcm.clone();
-	//}
 
 	cv::Rect mR;
 	mR.x = 0;
-	mR.y = resizedMat.rows / 2;
-	mR.height = resizedMat.rows / 2;
-	mR.width = resizedMat.cols / 2;
+	mR.y = srcm.rows / 2;
+	mR.height = srcm.rows / 2;
+	mR.width = srcm.cols / 2;
 
+	cv::normalize(srcm, srcm, 255, 0, cv::NORM_MINMAX);
 
-	double vPix = ImageProcessFunc::getAveragePixelInRect(resizedMat, mR);
+	double vPix = ImageProcessFunc::getAveragePixelInRect(srcm, mR);
 	double anchor = 120;
 	double alpha = 3.0;
 	double beta = 200 - vPix;
-	ImageProcessFunc::adJustBrightness(resizedMat, alpha, beta, anchor);
+
+	ImageProcessFunc::adJustBrightness(srcm, alpha, beta, anchor);
 
 	//cv::threshold(resizedMat, resizedMat, vPix*0.6, 255, cv::THRESH_BINARY);
 #ifdef ARBITURARY_TAG_DEBUG
-	imshow("_runOcrµ˜’˚¡¡∂»∫Û", resizedMat);
+	imshow("_runOcrË∞ÉÊï¥‰∫ÆÂ∫¶Âêé", srcm);
 #endif // OCR_DEBUG
-	int w = resizedMat.cols;
-	int h = resizedMat.rows;
-	unsigned char *pImgData = resizedMat.data;
+	int w = srcm.cols;
+	int h = srcm.rows;
+	unsigned char *pImgData = srcm.data;
 
 	//cout << "h" << w << endl;
 
 	tesseract::TessBaseAPI* pTess = (tesseract::TessBaseAPI*)pConfig->pTessThld;
 	if (pTess == NULL)
 	{
+		log_str += "tesseract pointer is Null,";
 		return 0;
 	}
 	pTess->SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_BLOCK);
 	//pTess->SetVariable("save_best_choices", "T");
-	pTess->SetImage(pImgData, w, h, resizedMat.channels(), resizedMat.step1());
+	pTess->SetImage(pImgData, w, h, srcm.channels(), srcm.step1());
 	pTess->SetVariable("user_defined_api", "72");
 	pTess->Recognize(0);
 
@@ -1161,13 +1289,19 @@ int OCRArbitaryTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	std::cout << std::unique_ptr<char[]>(pTess->GetUTF8Text()).get() << std::endl;
 #endif // OCR_DEBUG
 	//
-	char tmp[2048] = { 0 };
-	char *res_data = pTess->GetUTF8Text();
-	strcpy_s(tmp, 2047, res_data);
-	if(res_data!=nullptr)
-		delete[] res_data;
-	results = tmp;
 
+	char *res_data = NULL;
+	res_data = pTess->GetUTF8Text();
+	//pTess->GetUNLVText();
+	//std::cout <<"strlen:"<< strlen(res_data) << std::endl;
+	//std::cout << res_data << std::endl;
+	int str_len = strlen(res_data);
+	size_t max_lenth = std::min(str_len, 1024);
+	results = std::string(res_data, max_lenth);
+
+	if(res_data != NULL)
+		delete[] res_data;
+	
 	return 1;
 }
 
@@ -1176,15 +1310,13 @@ std::string OCRArbitaryTag::format_results(std::string res_str)
 	int digt_len = 0;
 	string postcode;
 	bool start = true;
-	for (int i=0;i<res_str.size();i++)
+	for (int i= res_str.size()/2;i<res_str.size();i++)
 	{
 		unsigned char c = res_str.at(i);
 		if (c == '.' || c == ',')
 		{
 			c = ' ';
 		}
-
-
 		if ((c == ' ' || c== '\n') && start == false)
 		{
 			start = true;
@@ -1210,9 +1342,1355 @@ std::string OCRArbitaryTag::format_results(std::string res_str)
 			start = false;
 		}
 	}
+
 	if (digt_len==5)
 	{
 		postcode = res_str.substr(res_str.size() - digt_len, digt_len);
 	}
 	return postcode;
 }
+
+OCRHandWriteBox::OCRHandWriteBox()
+{
+	
+
+	this->input_image_ = new std::array<float, MAX_IMAGE_NUM * WIDTH_ * HEIGHT_ * CHANNEL_>;
+
+	auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
+	input_tensor_ = Ort::Value::CreateTensor<float>(memory_info, input_image_->data(), input_image_->size(), input_shape_.data(), input_shape_.size());
+
+
+}
+
+int OCRHandWriteBox::initial_model(const wchar_t* model_file, float thresh_conf, size_t cuda_id)
+{
+	//session_options.SetIntraOpNumThreads(1);
+	// Available levels are
+	// ORT_DISABLE_ALL -> To disable all optimizations
+	// ORT_ENABLE_BASIC -> To enable basic optimizations (Such as redundant node removals)
+	// ORT_ENABLE_EXTENDED -> To enable extended optimizations (Includes level 1 + more complex optimizations like node fusions)
+	// ORT_ENABLE_ALL -> To Enable All possible opitmizations
+	session_options.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
+
+#ifdef USE_CUDA_DEVICE
+	OrtSessionOptionsAppendExecutionProvider_CUDA(session_options, cuda_id);
+#endif // USE_CUDA_DEVICE
+
+	//Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "");
+
+	try
+	{
+		m_pSession = new Ort::Session(env, model_file, session_options);
+	}
+	catch (const Ort::Exception& e)
+	{
+		std::cout << e.what() << std::endl;
+	}
+	m_threshold_confidence = thresh_conf;
+
+	return 1;
+}
+
+std::string OCRHandWriteBox::get_postcode_string(cv::Mat tag_mat)
+{
+	log_str = "";
+	std::vector<cv::Mat> boxes;
+	int res = get_handwrite_square_boxes(tag_mat, boxes);
+	if (!res)
+	{
+		log_str += "do not get five square box,";
+		return "";
+	}
+	for (int i=0;i<boxes.size();i++)
+	{
+		remove_box_border(boxes[i]);
+	}
+	return ocr_with_classifier(boxes);
+
+}
+
+std::string OCRHandWriteBox::get_last_log()
+{
+	return log_str;
+}
+
+
+int OCRHandWriteBox::find_key_words(cv::Mat tag_mat, std::vector<std::string>& key_words, void*pTess_/*=NULL*/)
+{
+	log_str = "";
+	if (tag_mat.empty())
+	{
+		log_str += "tag mat is empty, ";
+		return 0;
+	}
+	if (tag_mat.cols<40 || tag_mat.rows<40)
+	{
+		log_str += "tag mat size is too small, ";
+		return 0;
+	}
+
+	cv::Mat roimat;
+	tag_mat(cv::Rect(0, 0, tag_mat.cols / 4, tag_mat.rows / 2.3)).copyTo(roimat);
+
+	if (roimat.channels()==3)
+	{
+		cv::cvtColor(roimat, roimat, cv::COLOR_BGR2GRAY);
+	}
+	float dst_width = 240;
+	float scale = dst_width / roimat.cols;
+	cv::resize(roimat, roimat, cv::Size(), scale, scale);
+	cv::normalize(roimat, roimat, 255, 0, cv::NORM_MINMAX);
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::imshow("findkey range", roimat);
+#endif // DEBUG_HAND_WRITE_BOX
+
+	cv::Mat bnmat;
+	cv::threshold(roimat, bnmat, 120, 255, cv::THRESH_BINARY);
+
+	//Âà§Êñ≠Á±ªÂûãÔºåÈªëÂ∫ïÁôΩÂ≠óÔºåÁôΩÂ∫ïÈªëÂ≠ó
+	cv::Scalar meanv = cv::mean(bnmat);
+	//std::cout << "mean:" << meanv[0] << std::endl;
+	if (meanv[0] < 90)
+	{
+		bnmat = ~bnmat;
+		roimat = ~roimat;
+	}
+
+	cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+	cv::morphologyEx(bnmat, bnmat, cv::MORPH_CLOSE, element);
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(bnmat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+	
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::Mat drmat0 = bnmat.clone();
+	for (int i = 0; i < contours.size(); i++)
+	{
+		cv::drawContours(drmat0, contours, i, cv::Scalar(125));
+		cv::putText(drmat0, std::to_string(i), contours[i][0], 1, 1, cv::Scalar(255));
+	}
+	cv::imshow("hwrt_type_contours", drmat0);
+#endif
+
+
+	float bnmat_area = bnmat.cols*bnmat.rows;
+	int ind_contour = -1;
+	cv::Rect dstrc;
+	int pos_y = -1;
+	for (int i=0;i<contours.size();i++)
+	{
+		if (contours[i].size()<4) continue;
+		cv::Rect rc;
+		ImageProcessFunc::getContourRect(contours[i], rc);
+		double area = cv::contourArea(contours[i]);
+		if (area/(rc.area()+0.01)>0.8 && area>bnmat_area*0.1 && rc.y > pos_y)
+		{
+			pos_y = rc.y;
+			//std::cout<<"contour:"<<std::to_string(i) << ", area ratio:" << area / (dstrc.area() + 0.01) << ", area:" << area << std::endl;
+			dstrc = rc;
+			ind_contour = i;
+		}
+	}
+	if (ind_contour ==-1)
+	{
+		log_str += "can not locate type range,";
+		return 0;
+	}
+
+	cv::Mat mask(roimat.rows,roimat.cols, roimat.type(),cv::Scalar(0,0,0));
+	cv::drawContours(mask, contours, ind_contour,cv::Scalar(255,255,255), -1);
+	mask = mask(dstrc);
+
+	//cv::imshow("mask", mask);
+
+	cv::Mat squaremat(dstrc.height, dstrc.width, roimat.type(), cv::Scalar(255));
+	cv::copyTo(roimat(dstrc), squaremat, mask);
+
+	cv::normalize(squaremat, squaremat, 255, 0, cv::NORM_MINMAX);
+	meanv = cv::mean(squaremat);
+	float anchor = meanv[0] - 50;
+	anchor = std::max(anchor, 50.0f);
+	ImageProcessFunc::adJustBrightness(squaremat, 2, 1, anchor);
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::imshow("box type bnmat", squaremat);
+#endif // DEBUG_HAND_WRITE_BOX
+
+	cv::Mat ocrmat;
+	squaremat.copyTo(ocrmat);
+
+
+	tesseract::TessBaseAPI* pTess = (tesseract::TessBaseAPI*)pTess_;
+	if (pTess == NULL)
+	{
+		log_str += "tesseract pointer is Null,";
+		return 0;
+	}
+	pTess->SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_LINE);
+	//pTess->SetVariable("save_best_choices", "T");
+	pTess->SetImage(ocrmat.data, ocrmat.cols , ocrmat.rows, ocrmat.channels(), ocrmat.step1());
+	pTess->SetVariable("user_defined_api", "72");
+	pTess->Recognize(0);
+
+	// get result and delete[] returned char* string
+#ifdef DEBUG_HAND_WRITE_BOX
+	std::cout << std::unique_ptr<char[]>(pTess->GetUTF8Text()).get() << std::endl;
+#endif // OCR_DEBUG
+	//
+	char *res_data = NULL;
+	res_data = pTess->GetUTF8Text();
+
+	//std::cout <<"strlen:"<< strlen(res_data) << std::endl;
+	//std::cout << res_data << std::endl;
+	int str_len = strlen(res_data);
+	size_t max_lenth = std::min(str_len, 32);
+	std::string results = std::string(res_data, max_lenth);
+
+	if (res_data != NULL)
+		delete[] res_data;
+
+	std::transform(results.begin(), results.end(), results.begin(), ::tolower);
+
+	for (int i=0;i<key_words.size();i++)
+	{
+		size_t res = results.find(key_words[i]);
+		if (res!=std::string::npos)
+		{
+			return 1;
+		}
+	}
+	log_str += "can not find keywords";
+	return 0;
+}
+int OCRHandWriteBox::getPostCodeLine_nobox(const cv::Mat &srcMat, std::vector<cv::Mat> &toMats, std::vector<cv::Mat> &fromMats)
+{
+	if (srcMat.empty()) return 0;
+
+	Mat grymat;
+
+	float scal_max2 = 1000.0 / max(srcMat.cols, srcMat.rows);
+
+	cv::resize(srcMat, grymat, cv::Size(), scal_max2, scal_max2);
+
+	if (grymat.channels() == 3) cvtColor(grymat, grymat, COLOR_BGR2GRAY);
+
+
+	if (grymat.rows < 200 || grymat.cols < 200) return 0;
+
+
+	//Rect cr(bord_wd, 0, grymat.cols - 2 * bord_wd, grymat.rows);
+	Rect cr_sample(grymat.cols*0.2, grymat.rows*0.1, grymat.cols*0.6, grymat.rows*0.4);
+
+	//imshow("srcm2", centm);
+	double avg_pix = ImageProcessFunc::getAveragePixelInRect(grymat, cr_sample);
+
+	Mat bnmat;
+	cv::threshold(grymat, bnmat, avg_pix / 1.5, 255, cv::THRESH_BINARY);
+	bnmat = ~bnmat;
+
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("bnmat", bnmat);
+#endif // POSTCODE_BOX_DEBUG
+
+
+	cv::Mat element;
+	element = getStructuringElement(MORPH_RECT, Size(5, 20));
+	morphologyEx(bnmat, bnmat, MORPH_CLOSE, element);
+	element = getStructuringElement(MORPH_RECT, Size(50, 5));
+	morphologyEx(bnmat, bnmat, MORPH_CLOSE, element);
+
+	element = getStructuringElement(MORPH_RECT, Size(1, 5));
+	morphologyEx(bnmat, bnmat, MORPH_OPEN, element);
+
+
+	element = getStructuringElement(MORPH_RECT, Size(3, 3));
+	morphologyEx(bnmat, bnmat, MORPH_ERODE, element);
+
+
+
+
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("morpmat", bnmat);
+#endif // POSTCODE_BOX_DEBUG
+
+	//Ë£ÅÂàáÊéâÈªëËæπ
+	vector<unsigned int> sum_pixels;
+	ImageProcessFunc::sumPixels(bnmat, 0, sum_pixels);
+	int iw = bnmat.cols;
+	int cut_line_up = 0;
+	for (int i = 0; i < sum_pixels.size(); i++)
+	{
+		int avpix = sum_pixels[i] / iw;
+		if (avpix >= 127)
+		{
+			cut_line_up++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	int cut_line_down = 0;
+	for (int i = sum_pixels.size() - 1; i >= 0; i--)
+	{
+		int avpix = sum_pixels[i] / iw;
+		if (avpix >= 120)
+		{
+			cut_line_down++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	if ((cut_line_down + cut_line_up) > (bnmat.rows / 2))
+	{
+		cout << "Ë£ÅÂàá‰∏ä‰∏ãÂºÇÂ∏∏" << endl;
+		return 0;
+	}
+	Rect rc_tb_cut(0, 0, bnmat.cols, bnmat.rows);
+	if (cut_line_down != 0 || cut_line_up != 0)
+	{
+		rc_tb_cut.y = cut_line_up;
+		rc_tb_cut.height = rc_tb_cut.height - (cut_line_up + cut_line_down);
+	}
+	bnmat = bnmat(rc_tb_cut);
+
+	vector<unsigned int>().swap(sum_pixels);
+	ImageProcessFunc::sumPixels(bnmat, 1, sum_pixels);
+	int ih = bnmat.rows;
+	int cut_line_left = 0;
+	for (int i = 0; i < sum_pixels.size(); i++)
+	{
+		int avpix = sum_pixels[i] / ih;
+		if (avpix >= 127)
+		{
+			cut_line_left++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	int cut_line_right = 0;
+	for (int i = sum_pixels.size() - 1; i >= 0; i--)
+	{
+		int avpix = sum_pixels[i] / ih;
+		if (avpix >= 127)
+		{
+			cut_line_right++;
+		}
+		else
+		{
+			break;
+		}
+	}
+	if ((cut_line_left + cut_line_right) > (bnmat.cols / 2))
+	{
+		cout << "Ë£ÅÂàáÂ∑¶Âè≥ÂºÇÂ∏∏" << endl;
+		return 0;
+	}
+	Rect rc_lr_cut(0, 0, bnmat.cols, bnmat.rows);
+	if (cut_line_down != 0 || cut_line_up != 0)
+	{
+		rc_lr_cut.x = cut_line_left;
+		rc_lr_cut.width = rc_lr_cut.width - (cut_line_left + cut_line_right);
+	}
+	bnmat = bnmat(rc_lr_cut);
+
+
+#ifdef POSTCODE_BOX_DEBUG
+	imshow("cutmargin", bnmat);
+#endif // POSTCODE_BOX_DEBUG
+	////imshow("cut_tb", bnmat);
+
+	//Ëé∑ÂæóËΩÆÂªìÁöÑrect
+	std::vector<std::vector<cv::Point>>contours;
+	std::vector<cv::Vec4i> hierarchy;
+	std::vector<cv::Point> contour;
+	double aera = 0;
+	//src_gray = src_gray > 100;
+	cv::findContours(bnmat, contours, hierarchy, RETR_LIST, CHAIN_APPROX_SIMPLE);
+	vector<float> contours_score;
+	vector<Rect> contours_rect;
+	if (contours.size() == 0)
+	{
+		return 0;
+	}
+	for (int i = 0; i < contours.size(); i++)
+	{
+		Rect _rc;
+		ImageProcessFunc::getContourRect(contours[i], _rc);
+		double maera = cv::contourArea(contours[i]);
+		if (_rc.width*_rc.height * 0.3 > maera)//ËΩÆÂªìÈù¢ÁßØÂè™ÊúârectÈù¢ÁßØÁöÑ1/2ÔºåÂºÉÊéâ
+		{
+			continue;
+		}
+		//rectangle(bnmat, _rc, Scalar(125, 125, 125));
+		contours_rect.push_back(_rc);
+	}
+	score_for_rect(contours_rect, bnmat.cols, bnmat.rows, contours_score);
+
+	//Êü•ÊâæËØÑÂàÜÂ§ß‰∫éÈòàÂÄºÁöÑrect
+	float score_threshold = 0.3;//ËØÑÂàÜÈòàÂÄº
+	vector<cv::Rect> candidate_rects;
+	for (int i = 0; i < contours_score.size(); i++)
+	{
+		if (contours_score[i] < score_threshold)
+		{
+			continue;
+		}
+		candidate_rects.push_back(contours_rect[i]);
+	}
+
+	if (candidate_rects.empty())
+	{
+		cout << "Ê≤°ÊúâÊâæÂà∞ÂêàÈÄÇÁöÑÂÄôÈÄâÊ°Ü" << endl;
+		return 0;
+	}
+
+	//ÊãÜÂàÜrect
+	vector<cv::Rect> candidate_lt_rects; //Â∑¶‰∏äËßí
+	vector<cv::Rect> candidate_rb_rects; //Âè≥‰∏ãËßí
+	for (int i = 0; i < candidate_rects.size(); i++)
+	{
+		if ((candidate_rects[i].x + candidate_rects[i].width / 2) < bnmat.cols / 2
+			|| (candidate_rects[i].y + candidate_rects[i].height / 2) < bnmat.rows / 2)
+		{
+			candidate_lt_rects.push_back(candidate_rects[i]);
+		}
+		else
+		{
+			candidate_rb_rects.push_back(candidate_rects[i]);
+		}
+	}
+
+	rc_lr_cut.x /= scal_max2;
+	rc_lr_cut.y /= scal_max2;
+	rc_lr_cut.height /= scal_max2;
+	rc_lr_cut.width /= scal_max2;
+
+
+	rc_tb_cut.x /= scal_max2;
+	rc_tb_cut.y /= scal_max2;
+	rc_tb_cut.width /= scal_max2;
+	rc_tb_cut.height /= scal_max2;
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, srcMat.cols, srcMat.rows), rc_tb_cut);
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, srcMat(rc_tb_cut).cols, srcMat(rc_tb_cut).rows), rc_lr_cut);
+
+	//Ëé∑ÂèñÂÄôÈÄâÁöÑÊ°Ü
+	vector<cv::Mat> fromMatVec;
+	vector<cv::Mat> toMatVec;
+	for (int i = 0; i < candidate_lt_rects.size(); i++)
+	{
+		cv::Rect refinedRect = candidate_lt_rects[i];
+		refinedRect.x /= scal_max2;
+		refinedRect.y /= scal_max2;
+		refinedRect.width /= scal_max2;
+		refinedRect.height /= scal_max2;
+		bool needRotate = false;
+		getHandWriteRange(srcMat(rc_tb_cut)(rc_lr_cut), refinedRect, refinedRect, needRotate);
+		cv::Mat candi_mat = srcMat(rc_tb_cut)(rc_lr_cut)(refinedRect);
+		if (needRotate)
+		{
+			cv::rotate(candi_mat, candi_mat, ROTATE_180);
+			toMatVec.push_back(candi_mat);
+		}
+		else
+		{
+			candi_mat = candi_mat.clone();
+			fromMatVec.push_back(candi_mat);
+		}
+
+	}
+
+	for (int i = 0; i < candidate_rb_rects.size(); i++)
+	{
+		cv::Rect refinedRect = candidate_rb_rects[i];
+		refinedRect.x /= scal_max2;
+		refinedRect.y /= scal_max2;
+		refinedRect.width /= scal_max2;
+		refinedRect.height /= scal_max2;
+		bool needRotate = false;
+		getHandWriteRange(srcMat(rc_tb_cut)(rc_lr_cut), refinedRect, refinedRect, needRotate);
+		cv::Mat candi_mat = srcMat(rc_tb_cut)(rc_lr_cut)(refinedRect);
+		if (needRotate)
+		{
+			cv::rotate(candi_mat, candi_mat, ROTATE_180);
+			fromMatVec.push_back(candi_mat);
+		}
+		else
+		{
+			candi_mat = candi_mat.clone();
+			toMatVec.push_back(candi_mat);
+		}
+
+	}
+	toMatVec.swap(toMats);
+	fromMatVec.swap(fromMats);
+
+
+	return 1;
+}
+
+
+
+int OCRHandWriteBox::getHandWriteRange(const cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect &dstRect, bool &need_rotate)
+{
+	if (srcMat.empty()) return 0;
+
+// 	if (srcMat.channels() == 3)
+// 	{
+// 		cv::cvtColor(srcMat, srcMat, COLOR_BGR2GRAY);
+// 	}
+
+
+	Rect best_rect1_refine = srcRect;
+	//Rect best_rect2_refine = contours_rect[best_ind2];
+
+	float zoom_scal_x = 1.5;
+	float zoom_scal_y = 2.0;
+
+	best_rect1_refine.width = best_rect1_refine.width*zoom_scal_x;
+	best_rect1_refine.height = best_rect1_refine.height*zoom_scal_y;
+	best_rect1_refine.x = best_rect1_refine.x - srcRect.width*(zoom_scal_x - 1) / 2;
+	best_rect1_refine.y = best_rect1_refine.y - srcRect.height*(zoom_scal_y - 1) / 2;
+
+
+	int res = ImageProcessFunc::CropRect(Rect(0, 0, srcMat.cols, srcMat.rows), best_rect1_refine);
+	if (res == 0) return 0;
+
+	dstRect = best_rect1_refine;
+
+	//Ê£ÄÊü•ÊòØÂê¶ÊóãËΩ¨
+	int top2rect1 = best_rect1_refine.y;
+	int left2rect1 = best_rect1_refine.x;
+	int bottom2rect1 = srcMat.rows - (top2rect1 + best_rect1_refine.height);
+	int right2rect1 = srcMat.cols - (left2rect1 + best_rect1_refine.width);
+
+	if (top2rect1 < bottom2rect1)
+	{
+		if (left2rect1 < srcMat.cols / 8)
+		{
+			need_rotate = true;
+		}
+		else
+		{
+			need_rotate = false;
+		}
+	}
+	else
+	{
+		if (right2rect1 > srcMat.cols / 8)
+		{
+			need_rotate = true;
+		}
+		else
+		{
+			need_rotate = false;
+		}
+	}
+
+	return 1;
+
+}
+int OCRHandWriteBox::score_for_rect(std::vector<cv::Rect> rcs, int im_width, int im_height, std::vector<float> &rc_scores)
+{
+	const int ref_width = 200;
+	const float ref_ratio = 7;
+	const int ref_height_up = 35;
+	const int ref_height_down = 10;
+
+	for (int i = 0; i < rcs.size(); i++)
+	{
+		float score_ = 1;
+		int c_x = rcs[i].x + rcs[i].width / 2;
+		int c_y = rcs[i].y + rcs[i].height / 2;
+		if ((c_x > im_width / 2 && c_y < im_height / 2) || (c_x<im_width / 2 && c_y>im_height / 2))
+		{
+			rc_scores.push_back(0);
+			continue;
+		}
+		if (rcs[i].height > ref_height_up || rcs[i].height < ref_height_down)
+		{
+			rc_scores.push_back(0);
+			continue;
+		}
+		float _ratio = float(rcs[i].width) / rcs[i].height;
+		float score_tmp = 1 - fabs(_ratio - ref_ratio) / ref_ratio; //ÈïøÂÆΩÊØîÊâìÂàÜ
+		score_tmp = (score_tmp < 0) ? 0 : score_tmp;
+		score_ *= score_tmp;
+
+		rc_scores.push_back(score_);
+
+
+	}
+
+	return 1;
+}
+int OCRHandWriteBox::split_digits_nobox(cv::Mat &srcMat, std::vector<cv::Mat> &dstDigits)
+{
+	if (srcMat.empty())
+	{
+		return 0;
+	}
+	if (srcMat.channels() == 3)
+	{
+		cvtColor(srcMat, srcMat, COLOR_BGR2GRAY);
+	}
+	cv::normalize(srcMat, srcMat, 255, 0, cv::NORM_MINMAX);
+	float avg_pix = ImageProcessFunc::getAverageBrightness(srcMat);
+	Mat adj_mat = srcMat.clone();
+	ImageProcessFunc::adJustBrightness(adj_mat, 10, 0, avg_pix / 2.0);
+	adj_mat = ~adj_mat;
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	imshow("digits", adj_mat);
+#endif // POSTCODE_BOX_DEBUG
+
+	vector<unsigned int> sum_pixs;
+	ImageProcessFunc::sumPixels(adj_mat, 1, sum_pixs);
+
+	int ih = adj_mat.rows;
+	vector<Point> seg_points_x;
+	bool start_flag = false;
+	Point pt;
+	for (size_t i = 0; i < sum_pixs.size(); i++)
+	{
+		int _p = sum_pixs[i] / ih;
+		if (_p > 3 && start_flag == false)
+		{
+			pt.x = i;
+			start_flag = true;
+		}
+		if (_p <= 3 && start_flag == true)
+		{
+			pt.y = i;
+			seg_points_x.push_back(pt);
+			start_flag = false;
+		}
+	}
+
+	vector<Rect> seg_rects;
+	for (size_t i = 0; i < seg_points_x.size(); i++)
+	{
+		Rect _rc(seg_points_x[i].x, 0, seg_points_x[i].y - seg_points_x[i].x, adj_mat.rows);
+		int iw = _rc.width;
+		vector<unsigned int> sum_pixs;
+		ImageProcessFunc::sumPixels(adj_mat(_rc), 0, sum_pixs);
+		Point pt;
+		for (size_t j = 0; j < sum_pixs.size(); j++)
+		{
+			int _p = sum_pixs[j] / iw;
+			if (_p > 10)
+			{
+				pt.x = j;
+				break;
+			}
+		}
+		for (size_t j = sum_pixs.size() - 1; j >= 0; j--)
+		{
+			int _p = sum_pixs[j] / iw;
+			if (_p > 10)
+			{
+				pt.y = j;
+				break;
+			}
+		}
+		if (pt.x == pt.y)
+		{
+			cout << "ÂàÜÂâ≤Êï∞Â≠óÂ§±Ë¥•" << endl;
+			return 0;
+		}
+		_rc.y = pt.x;
+		_rc.height = pt.y - pt.x + 1;
+		seg_rects.push_back(_rc);
+	}
+
+	//ËøáÊª§rect
+	if (seg_rects.size() < 5)
+	{
+		cout << "ÂàÜÂâ≤Êï∞Â≠óÂ§±Ë¥•" << endl;
+		return 0;
+	}
+	if (seg_rects.size() > 5)
+	{
+		vector<Rect>::iterator it = seg_rects.begin();
+		int area_threshold = 50;
+		for (; it != seg_rects.end();)
+		{
+			if (it->area() < area_threshold)
+			{
+				it = seg_rects.erase(it);
+			}
+			else
+			{
+				it++;
+			}
+		}
+	}
+#ifdef DEBUG_HAND_WRITE_BOX
+	Mat mshow = adj_mat.clone();
+	for (size_t i = 0; i < seg_rects.size(); i++)
+	{
+		rectangle(mshow, seg_rects[i], Scalar(150, 150, 150));
+	}
+	imshow("adj_mat", mshow);
+#endif // POSTCODE_BOX_DEBUG
+
+
+	if (seg_rects.size() != 5)
+	{
+		cout << "ÂàÜÂâ≤Êï∞Â≠óÂ§±Ë¥•" << endl;
+		return 0;
+	}
+
+	//Ë∞ÉÊï¥rectÂ∞∫ÂØ∏
+	for (size_t i = 0; i < seg_rects.size(); i++)
+	{
+		Rect _rc = seg_rects[i];
+		int bd = 3;
+		_rc.x -= bd;
+		_rc.y -= bd;
+		_rc.width += 2 * bd;
+		_rc.height += 2 * bd;
+		if (_rc.width < _rc.height)
+		{
+			int cent_x = _rc.x + _rc.width / 2;
+			_rc.width = _rc.height;
+			_rc.x = cent_x - _rc.width / 2;
+		}
+		if (_rc.width > _rc.height)
+		{
+			int cent_y = _rc.y + _rc.height / 2;
+			_rc.height = _rc.width;
+			_rc.y = cent_y - _rc.height / 2;
+		}
+		ImageProcessFunc::CropRect(Rect(0, 0, adj_mat.cols, adj_mat.rows), _rc);
+		seg_rects[i] = _rc;
+	}
+	Mat cropMat;
+	srcMat.copyTo(cropMat);
+	ImageProcessFunc::adJustBrightness(cropMat, 10, 0, avg_pix / 1.4);
+	//cropMat = ~cropMat;
+
+
+	for (size_t i = 0; i < seg_rects.size(); i++)
+	{
+		Mat _m = cropMat(seg_rects[i]);
+		cv::resize(_m, _m, cv::Size(32, 32));
+		dstDigits.push_back(_m.clone());
+	}
+	return 1;
+}
+
+
+int OCRHandWriteBox::getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector<std::string> &result_str, std::vector<float> &confidence)
+{
+	if (srcMat_vec.size() == 0) return 0;
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::Mat showMat(cv::Size(srcMat_vec.size() * 32, 32), CV_8UC1);
+	for (int i = 0; i < srcMat_vec.size(); i++)
+	{
+		cv::Rect r(i * 32, 0, 32, 32);
+		srcMat_vec[i].copyTo(showMat(r));
+	}
+	imshow("post_code_boxes", showMat);
+#endif // POSTCODE_BOX_DEBUG
+
+	int postcodeline_num = srcMat_vec.size() / 5;
+
+
+	for (int i = 0; i < postcodeline_num; i++)
+	{
+		std::vector<cv::Mat> m_vec(srcMat_vec.begin() + i*5, srcMat_vec.begin() + (i+1)*5);
+		std::string res_str;
+		float confid = 0;
+		res_str = ocr_with_classifier(m_vec, &confid);
+
+		result_str.push_back(res_str);
+		confidence.push_back(confid);
+
+	}
+
+	return postcodeline_num;
+
+}
+bool sort_func_vertical(cv::Rect &a, cv::Rect &b)
+{
+	return (a.tl().y + a.br().y) > (b.tl().y + b.br().y);
+}
+bool sort_func_horizon(cv::Rect &a, cv::Rect &b)
+{
+	return (a.tl().x + a.br().x) < (b.tl().x + b.br().x);
+}
+
+std::string OCRHandWriteBox::get_postcode_string_test_v2(const cv::Mat &tag_mat)
+{
+	log_str = "";
+	if (tag_mat.empty())
+	{
+		log_str += "tag mat is empty, ";
+		return "";
+	}
+
+	float scal = 640.0f / tag_mat.cols;
+	cv::Mat rsmat;
+	cv::resize(tag_mat, rsmat, cv::Size(), scal, scal);
+	if (rsmat.channels()==3)
+	{
+		cv::cvtColor(rsmat, rsmat, cv::COLOR_BGR2GRAY);
+	}
+	cv::Rect digit_rc(rsmat.cols*0.4, rsmat.rows*0.75, rsmat.cols*0.6, (rsmat.rows - rsmat.rows*0.75));
+	rsmat = rsmat(digit_rc).clone();
+
+	
+
+ 	cv::Scalar meanv = cv::mean(rsmat);
+ 	ImageProcessFunc::adJustBrightness(rsmat, 3, 1, meanv[0]*0.55);
+	cv::Mat graymat;
+	rsmat.copyTo(graymat);
+
+	meanv = cv::mean(rsmat);
+ 	cv::threshold(rsmat, rsmat, meanv[0]*0.45, 255, cv::THRESH_BINARY);
+ 	rsmat = ~rsmat;
+// 
+	cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+	cv::morphologyEx(rsmat, rsmat, cv::MORPH_DILATE, element);
+	element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
+	cv::morphologyEx(rsmat, rsmat, cv::MORPH_CLOSE, element);
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::imshow("nobox_postcode_line", rsmat);
+#endif // DEBUG_HAND_WRITE_BOX
+
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(rsmat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+	if (contours.size() < 5)
+	{
+		log_str += "total contours num lower than 5, ";
+		return "";
+	}
+	std::vector<cv::Rect> cand_rects;
+	for (int i=0;i<contours.size();i++)
+	{
+		cv::Rect rc;
+		ImageProcessFunc::getContourRect(contours[i],rc);
+		if (rc.height < rsmat.rows*0.1)
+		{
+			continue;
+		}
+		if (float(rc.width)/rc.height>2)
+		{
+			continue;
+		}
+		cand_rects.push_back(rc);
+	}
+
+	if (cand_rects.size() < 5)
+	{
+		log_str += "valid contours num lower than 5, ";
+		return "";
+	}
+	if (cand_rects.size() > 5)//ÈÄâÂèñÂ∫ïÈÉ®ÁöÑ5‰∏™
+	{
+		std::sort(cand_rects.begin(), cand_rects.end(), sort_func_vertical);
+		std::vector<cv::Rect> _cand_rects(cand_rects.begin(), cand_rects.begin() + 5);
+		cand_rects.swap(_cand_rects);
+	}
+	std::sort(cand_rects.begin(), cand_rects.end(), sort_func_horizon); //Ê∞¥Âπ≥ÊéíÂàó
+
+	//Ê£ÄÊü•Ê∞¥Âπ≥Èó¥Ë∑ù
+	float min_v = 1000;
+	float max_v = 0;
+	for (int i = 0; i < cand_rects.size() - 1; i++)
+	{
+		float wr = ((cand_rects[i + 1].br() + cand_rects[i + 1].tl()) / 2 - \
+			(cand_rects[i].br() + cand_rects[i].tl()) / 2).x;
+
+		if (wr < min_v) min_v = wr;
+		if (wr > max_v) max_v = wr;
+	}
+	if ((max_v - min_v) / (max_v + min_v + 0.0001) > 0.4)
+	{
+		log_str += "digits distance exception,";
+		return "";
+	}
+	//cv::threshold(graymat, graymat, meanv[0] * 0.65, 255, cv::THRESH_BINARY);
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::imshow("nobox_postcode_img", graymat);
+#endif
+	//
+
+
+	cv::normalize(graymat, graymat, 255, 0, cv::NORM_MINMAX);
+	meanv = cv::mean(graymat);
+	ImageProcessFunc::adJustBrightness(graymat, 3, 1, meanv[0] * 0.45);
+
+
+
+	std::vector<cv::Mat> digits_mats;
+	for (int i=0;i<cand_rects.size();i++)
+	{
+		int size_ = std::max(cand_rects[i].width, cand_rects[i].height);
+		size_ += 10;
+		cv::Point cent = (cand_rects[i].br() + cand_rects[i].tl()) / 2;
+		cv::Rect rc;
+		rc.x = cent.x - size_ / 2;
+		rc.y = cent.y - size_ / 2;
+		rc.width = size_;
+		rc.height = size_;
+		ImageProcessFunc::CropRect(cv::Rect(0, 0, rsmat.cols, rsmat.rows), rc);
+#ifdef DEBUG_HAND_WRITE_BOX
+		cv::imshow(std::to_string(i), graymat(rc));
+#endif // DEBUG_HAND_WRITE_BOX
+
+		digits_mats.push_back(graymat(rc));
+	}
+
+	std::string postcode = ocr_with_classifier(digits_mats);
+	return postcode;
+
+}
+
+int OCRHandWriteBox::identify_handbox_type(const cv::Mat &srcm)
+{
+
+	if (srcm.empty())
+	{
+		return 0;
+	}
+	cv::Mat tmat;
+	srcm(cv::Rect(0, 0, srcm.cols, srcm.rows / 2)).copyTo(tmat);
+	int dstwidth = 480;
+	float scal = float(dstwidth) / tmat.cols;
+	cv::resize(tmat, tmat, cv::Size(), scal, scal);
+	cv::medianBlur(tmat, tmat, 3);
+
+	cv::Scalar meanv;
+	cv::Scalar stdv;
+
+	cv::meanStdDev(tmat, meanv, stdv);
+// 	std::cout << "mean:" << meanv[0] << std::endl;
+// 	std::cout << "stdv:" << stdv[0] << std::endl;
+
+	if (stdv[0] < 22.5f)
+	{
+		return 1;
+	}
+	else
+	{
+		return 2;
+	}
+
+	return 1;
+}
+
+std::string OCRHandWriteBox::get_postcode_string_test(cv::Mat srcMat)
+{
+	if (srcMat.empty())
+	{
+		return "";
+	}
+	//Mat fromMat, toMat;
+	if (srcMat.rows > srcMat.cols) cv::rotate(srcMat, srcMat, ROTATE_90_CLOCKWISE);//ÊóãËΩ¨ÂõæÁâá
+	vector<Mat> toMats, fromMats;
+	int res = getPostCodeLine_nobox(srcMat, toMats, fromMats);
+	if (res == 0)
+	{
+		return "";
+	}
+#ifdef POSTCODE_BOX_DEBUG
+	for (int i = 0; i < fromMats.size(); i++)
+	{
+		imshow("FromMat" + to_string(i), fromMats[i]);
+	}
+	for (int i = 0; i < toMats.size(); i++)
+	{
+		imshow("ToMat" + to_string(i), toMats[i]);
+	}
+
+#endif // POSTCODE_BOX_DEBUG
+
+	vector<Mat> to_digits_vec;
+	for (int i = 0; i < toMats.size(); i++)
+	{
+		res = split_digits_nobox(toMats[i], to_digits_vec);
+		if (res == 0)
+		{
+			continue;
+		}
+	}
+	if (to_digits_vec.empty())
+	{
+		cout << "Êú™ÊâæÂà∞ÁõÆÁöÑÂú∞ÈÇÆÁºñÔºÅ" << endl;
+		return "";
+	}
+	vector<string> to_code_vec;
+	vector<float> to_confidence_vec;
+
+	getPostCode_nobox(to_digits_vec, to_code_vec, to_confidence_vec);
+
+	
+	int code_index = -1;
+	float tem_confidence = 0;
+	for (int i = 0; i < to_confidence_vec.size(); i++)
+	{
+		if (tem_confidence < to_confidence_vec[i] && to_confidence_vec[i] >= m_threshold_confidence)
+		{
+			code_index = i;
+			tem_confidence = to_confidence_vec[i];
+		}
+	}
+	string to_postcode, from_postcode;
+	if (code_index != -1)
+	{
+		to_postcode = to_code_vec[code_index];
+	}
+	else
+	{
+		cout << "ÁõÆÁöÑÂú∞ÈÇÆÁºñÁΩÆ‰ø°Â∫¶ËæÉ‰Ωé" << endl;
+		return "";
+	}
+
+	return to_postcode;
+}
+
+bool sort_contours_func(std::vector<cv::Point> &a, std::vector<cv::Point> &b)
+{
+	cv::Point ct1 = (a[0] + a[a.size() / 3] + a[a.size() * 2 / 3]) / 3;
+	cv::Point ct2 = (b[0] + b[b.size() / 3] + b[b.size() * 2 / 3]) / 3;
+	return ct1.x < ct2.x;
+}
+
+
+
+int OCRHandWriteBox::get_handwrite_square_boxes(cv::Mat &srcm, std::vector<cv::Mat> &square_boxes)
+{
+	if (srcm.empty())
+	{
+		log_str += "src image is empty,";
+		return 0;
+	}
+	if (srcm.rows > srcm.cols)
+	{
+		log_str += "image height is large than width,";
+		return 0;
+	}
+	if (srcm.cols < 64 || srcm.rows < 64)
+	{
+		log_str += "image size is to small, ";
+		return 0;
+	}
+
+	int hdwrt_hight = srcm.rows * 0.25;
+	cv::Rect rng_rct(0, srcm.rows - hdwrt_hight - 1, srcm.cols, hdwrt_hight);
+	cv::Mat rng_mat;
+	srcm(rng_rct).copyTo(rng_mat);
+
+	if (srcm.channels() == 3)
+	{
+		cv::cvtColor(rng_mat, rng_mat, COLOR_BGR2GRAY);
+	}
+
+
+	
+	int dst_width = 720;
+	float scal_ = float(dst_width)/ rng_mat.cols;
+	cv::Mat rzmat;
+	cv::resize(rng_mat, rzmat, cv::Size(), scal_, scal_,cv::INTER_LINEAR);
+	//cv::imshow("s", rzmat);
+
+	cv::normalize(rzmat, rzmat, 255, 0, cv::NORM_MINMAX);
+	//cv::equalizeHist(rzmat, rzmat);
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::imshow("handbox_bn", rzmat);
+#endif // DEBUG_HAND_WRITE_BOX
+	
+	
+	cv::Scalar mean_pxl = cv::mean(rzmat);
+
+	cv::Mat bnmat;
+	cv::threshold(rzmat, bnmat, mean_pxl[0] - 25, 255, cv::THRESH_BINARY_INV);
+	//cv::imshow("bn", bnmat);
+
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::imshow("hwrt box bnmat", bnmat);
+#endif
+
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(bnmat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+
+	//ËøáÊª§ËΩÆÂªì-ÂÆΩÈ´òÊØîÔºåÂ∞∫ÂØ∏ËøáÊª§
+	//std::vector<cv::Point> tl_pt;
+	std::vector<std::vector<cv::Point>>::iterator it;
+	for (it=contours.begin();it!=contours.end();)
+	{
+		cv::Rect rc;
+		int res = ImageProcessFunc::getContourRect(*it, rc);
+		if (float(rc.width)/rc.height < 0.75 || float(rc.width) / rc.height > 1.25 \
+			|| rc.width < bnmat.cols*0.05 || rc.width > bnmat.cols*0.1)
+		{
+			it = contours.erase(it);
+		}
+		else
+		{
+			//tl_pt.push_back(rc.tl());
+			it++;
+		}
+	}
+
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::Mat drmat0 = rzmat.clone();
+	for (int i = 0; i < contours.size(); i++)
+	{
+		cv::drawContours(drmat0, contours, i, cv::Scalar(125));
+		cv::putText(drmat0, std::to_string(i), contours[i][0], 1, 1, cv::Scalar(255));
+	}
+	cv::imshow("hwrt_boxes_contours", drmat0);
+#endif
+
+	if (contours.size() < 5)
+	{
+		log_str += "square box num is lower than 5,";
+		return 0;
+	}
+	if (contours.size() > 5)
+	{
+		for (it = contours.begin() + 5; it != contours.end();) //‰øùÁïôÂ∫ïÈÉ®ÁöÑ‰∫î‰∏™ËΩÆÂªì
+		{
+			it = contours.erase(it);
+		}
+	}
+
+	//Èù¢ÁßØÂØπÊØîËøáÊª§
+	cv::Rect arc;
+	ImageProcessFunc::getContourRect(contours[0], arc);
+	double area = arc.area() + 1e-6;
+	for (int i=1;i<contours.size();i++)
+	{
+		ImageProcessFunc::getContourRect(contours[i], arc);
+		double area_rate = arc.area() / area;
+		if (area_rate<0.7 || area_rate > 1.3)
+		{
+			log_str += "square area is exception,";
+			return 0;
+		}
+		cv::Rect rc;
+	}
+
+	std::sort(contours.begin(), contours.end(), sort_contours_func);
+
+	//Ë∑ùÁ¶ªËøáÊª§
+	std::vector<cv::Rect> outrects;
+	for (int i=0;i<contours.size();i++)
+	{
+		cv::Rect rc;
+		ImageProcessFunc::getContourRect(contours[i], rc);
+		outrects.push_back(rc);
+	}
+	
+	float min_v=1000;
+	float max_v=0;
+	for (int i=0;i<outrects.size()-1;i++)
+	{
+		float wr = outrects[i + 1].x - outrects[i].x;
+		if (wr < min_v) min_v = wr;
+		if (wr > max_v) max_v = wr;
+	}
+	//auto minmax = std::minmax(dist_vec.begin(), dist_vec.end());
+
+	if ((max_v - min_v) / (max_v + min_v + 0.0001) > 0.3)
+	{
+		log_str += "square distance exception,";
+		return 0;
+	}
+
+#ifdef DEBUG_HAND_WRITE_BOX
+	cv::Mat drmat = rzmat.clone();
+	for (int i = 0; i < contours.size(); i++)
+	{
+		cv::drawContours(drmat, contours, i, cv::Scalar(125));
+		cv::putText(drmat, std::to_string(i), contours[i][0], 1, 1, cv::Scalar(255));
+	}
+	cv::imshow("hwrt_boxes", drmat);
+#endif
+	
+	
+
+	for (int i=0;i<5;i++)
+	{
+
+		cv::Mat box = cv::Mat(outrects[i].size(), rzmat.type(),cv::Scalar(45,45,45));
+		cv::Mat maskmat = cv::Mat::zeros(outrects[i].size(), rzmat.type());
+		for (int j=0;j<contours[i].size();j++)
+		{
+			contours[i][j] -= outrects[i].tl();
+		}
+		cv::drawContours(maskmat, contours, i, cv::Scalar(255, 255, 255), -1);
+
+		rzmat(outrects[i]).copyTo(box, maskmat);
+		square_boxes.push_back(box);
+
+ 		//cv::imshow(std::to_string(i), box);
+// 		cv::waitKey(0);
+	}
+	return 1;
+}
+
+int OCRHandWriteBox::remove_box_border(cv::Mat &src_mat)
+{
+
+	cv::medianBlur(src_mat, src_mat, 3);
+	cv::normalize(src_mat, src_mat, 0, 255, cv::NORM_MINMAX, CV_8U);
+	//src_mat.convertTo(src_mat, CV_8U);
+// 	double minv, maxv;
+// 	cv::minMaxIdx(src_mat, &minv, &maxv);
+
+	//cv::imshow("rm_src", src_mat);
+	cv::Mat bnmat;
+	cv::threshold(src_mat, bnmat, 125, 255, cv::THRESH_BINARY);
+	Mat element = cv::getStructuringElement(cv::MORPH_RECT, Size(15, 15));
+	cv::morphologyEx(bnmat, bnmat, cv::MORPH_CLOSE, element , cv::Point(-1, -1),1,0,0);
+	element = cv::getStructuringElement(cv::MORPH_RECT, Size(3, 3));
+	cv::morphologyEx(bnmat, bnmat, cv::MORPH_ERODE, element);
+
+	cv::Mat dstm = cv::Mat(bnmat.size(), src_mat.type(), cv::Scalar(200, 200, 200));
+
+	src_mat.copyTo(dstm, bnmat);
+
+	ImageProcessFunc::adJustBrightness(dstm, 2, 0, 75);
+	
+	src_mat = dstm;
+
+	return 1;
+}
+
+std::string OCRHandWriteBox::ocr_with_classifier(std::vector<cv::Mat> &srcms, float *pConf)
+{
+	//ÂØºÂÖ•ÂõæÂÉèÊï∞ÊçÆ
+	if (srcms.size()!= MAX_IMAGE_NUM)
+	{
+		log_str += std::string("input image num ") + std::to_string(srcms.size()) + \
+			" not equal to model defined " + std::to_string(MAX_IMAGE_NUM);
+		return "";
+	}
+	for (int i =0;i<MAX_IMAGE_NUM;i++)
+	{
+		if (CHANNEL_!=srcms[i].channels())
+		{
+			cv::cvtColor(srcms[i], srcms[i], cv::COLOR_BGR2GRAY);//ÁÅ∞Â∫¶ÂçïÈÄöÈÅì
+		}
+		cv::resize(srcms[i], srcms[i], cv::Size(WIDTH_, HEIGHT_));
+		srcms[i] = 255 - srcms[i];//ÁôΩÂ∫ïËΩ¨ÈªëÂ∫ï
+		double minv, maxv;
+
+		//cv::imshow(std::to_string(i), srcms[i]);
+
+		cv::minMaxIdx(srcms[i], &minv, &maxv);
+		if (maxv < 100)
+		{
+			log_str += "one digit in square is empty,";
+			return ""; //Á©∫
+		}
+		
+		cv::Mat m;
+		srcms[i].convertTo(m, CV_32FC1);//ÁÅ∞Â∫¶ÂçïÈÄöÈÅì
+
+		size_t st_pos_img = i * CHANNEL_*HEIGHT_*WIDTH_;
+		memcpy((float*)input_image_ + st_pos_img, m.data, sizeof(float)*WIDTH_*HEIGHT_);
+	}
+
+	std::vector<DigitClassRes> pred_res;
+	std::string res_str;
+	float min_conf = 1;
+	int low_conf_ind = 0;
+	//ËøêË°åÊ®°Âûã
+	try
+	{
+		auto output_tensors = m_pSession->Run(Ort::RunOptions{ nullptr }, input_node_names.data(), &input_tensor_, 1, output_node_names.data(), 1);
+		if (output_tensors.size()==0) 
+		{
+			log_str += "onnxruntime return none,";
+			return "";
+		}
+		auto output_shape = output_tensors[0].GetTensorTypeAndShapeInfo().GetShape(); // batch x out_feats
+		float *pData = output_tensors[0].GetTensorMutableData<float>();
+		int batch_size = output_shape[0];
+		int out_feats = output_shape[1];
+		
+		for (int i=0;i< batch_size;i++)
+		{
+			float* pos = pData + i * out_feats;
+			int class_ind = 0;
+			float confidence = 0;
+			for (int j=0;j<out_feats;j++)
+			{
+				if (*(pos+j) > confidence)
+				{
+					confidence = *(pos+j);
+					class_ind = j;
+				}
+			}
+			
+			if (confidence<min_conf)
+			{
+				min_conf = confidence;
+				low_conf_ind = i;
+			}
+			res_str += std::to_string(class_ind);
+		}
+	}
+	catch (const Ort::Exception& e)
+	{
+		log_str += std::string("digits classifier exception:") + e.what();
+		return "";
+	}
+	log_str += "confidence:" + std::to_string(min_conf) + ",";
+
+	if (min_conf < m_threshold_confidence)
+	{
+		log_str += "the " + to_string(low_conf_ind+1) +"rd square confidence is low,";
+		return "";
+	}
+	if (pConf!=NULL)
+	{
+		*pConf = min_conf;
+	}
+	return res_str;
+}
+
+std::string OCRHandWriteBox::ocr_with_tesseract(std::vector<cv::Mat> &srcms)
+{
+	if (srcms.empty()) return "";
+	int width = 0;
+	int height = 0;
+	for (int i=0;i<srcms.size();i++)
+	{
+		width += srcms[i].cols;
+		height = (height < srcms[i].rows) ? srcms[i].rows : height;
+	}
+	if (width < 5 || height < 5) return "";
+	cv::Mat dm = cv::Mat(height, width, srcms[0].type(), cv::Scalar(255, 255, 255));
+	int pos = 0;
+	for (int i=0;i<srcms.size();i++)
+	{
+		cv::Rect rc(pos, (height - srcms[i].rows) / 2, srcms[i].cols, srcms[i].rows);
+		srcms[i].copyTo(dm(rc));
+		pos += srcms[i].cols;
+	}
+	//cv::imshow("dmats", dm);
+
+	return "";
+}
+
+
+

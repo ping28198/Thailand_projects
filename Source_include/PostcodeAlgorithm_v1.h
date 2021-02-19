@@ -2,7 +2,6 @@
 #include <opencv2/opencv.hpp>
 #include <tesseract/baseapi.h>
 #include <onnxruntime_cxx_api.h>
-#include <cuda_provider_factory.h>
 #include <string>
 #include <ThreadPool.h>
 #include "ImageProcessFunc.h"
@@ -12,69 +11,39 @@
 #define MAX_BOX_NUM 32
 
 
-
-
 //#define DEBUG_ONNX_EFFICIENTDET_R0
-//#define POSTCODE_ROI_DEBUG
-#define ARBITURARY_TAG_DEBUG
-
-
+//#define DEBUG_STD_TAG
+//#define ARBITURARY_TAG_DEBUG
+//#define USE_CUDA_DEVICE
+//#define DEBUG_HAND_WRITE_BOX
 class MatchDataStruct
 {
 public:
 	cv::Mat descriptors_tag_line;
 	std::vector<cv::KeyPoint> keypoints_tag_line;
-	//int loadMatchData(const std::string &xmlfile);
-	//int saveMatchData(const std::string &xmlfile);
 	int getMatchDataFromImg_tag_line(const std::string &refImg1);
 
 };
 
 
-
 class OcrAlgorithm_config
 {
 public:
-	std::string tess_en_data_path;
-	std::string tess_thld_data_path;
-	std::string tess_template_path;
-	std::string handwrite_model_path;
-	std::string tag_ref_line_img_path;
 
-
-	void *pTessEn;
-	void *pTessThld;
-	void *pHWDigitsRecog;
-	void *pTagDetector;
-	void *pLogger;
-
-	float TagDetectConfidence;
-	float HandwriteDigitsConfidence;
-
-	int Run_OCR_on_standard_tag; //是否检测标准标签邮编
-	int Run_OCR_on_handwrite_box; //是否检测手写邮编
-	int Run_OCR_on_unknown_tag; //是否检测任意标签
-	int is_test_model; //是否为测试模式，仅为测试验收使用
+	void *pTessEn=nullptr;
+	void *pTessThld=nullptr;
+	void *pTessHandWrt=nullptr;
+	int strict_mode = 0; //严格模式下不支持邮编位数4
+	int std_postcode_num = 5;
+	bool support_postcode_4 = 0;
+	bool support_postcode_10 = 0;
 
 	MatchDataStruct match_data;
 
 	OcrAlgorithm_config()
 	{
-		pTessEn = NULL;
-		pTessThld = NULL;
-		pHWDigitsRecog = NULL;
-		pTagDetector = NULL;
-		pLogger = NULL;
-		HandwriteDigitsConfidence = 0.85;
-		TagDetectConfidence = 0.9;
-		Run_OCR_on_handwrite_box = 1;
-		Run_OCR_on_standard_tag = 1;
-		Run_OCR_on_unknown_tag = 1;
-		is_test_model = 0;
+
 	}
-
-
-
 };
 
 
@@ -94,7 +63,7 @@ struct importMat_args
 class TagDetector
 {
 public:
-	TagDetector(const wchar_t* model_path, float confidence_threshold=0.3, int cuda_id=-1, size_t input_image_num = 1); // cuda_id = -1 use cpu
+	TagDetector(const wchar_t* model_path, float confidence_threshold = 0.3, int cuda_id = -1, size_t input_image_num = 1); // cuda_id = -1 use cpu
 
 	int initial();
 
@@ -103,7 +72,7 @@ private:
 	static const int WIDTH_ = 512;
 	static const int HEIGHT_ = 512;
 	static const int CHANNEL_ = 3;
-	
+
 
 	//static const int MAX_BOX_NUM = 128;
 	static const int FEATS_PER = 8;
@@ -175,10 +144,7 @@ private:
 	void nms_multi_class(std::vector<cv::RotatedRect> &rects, std::vector<int> &class_ids, float iou_threshold);
 public:
 
-
-	void detectParcels(std::vector<cv::Mat> &srcms, std::vector<std::vector<cv::RotatedRect>> & rrects,std::vector<std::vector<int>> &cls_inds);
-
-
+	void detectParcels(std::vector<cv::Mat> &srcms, std::vector<std::vector<cv::RotatedRect>> & rrects, std::vector<std::vector<int>> &cls_inds);
 
 
 };
@@ -191,8 +157,10 @@ public:
 	OCRStandardTag();
 
 	std::string get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_config *pConfig);
+	std::string get_last_log();
 
 private:
+	std::string log_str;
 	int get_postcode_line(cv::Mat srcm, cv::Mat &dstm);
 
 	int _run_ocr(cv::Mat post_code_line, std::string &results, OcrAlgorithm_config *pConfig);
@@ -201,10 +169,10 @@ private:
 
 
 	//用于格式化邮编
-	int format_postcode(std::string &str);
+	int format_postcode(std::string &str, OcrAlgorithm_config *pConfig=nullptr);
 	double continuousDigitsScore(std::string srcStr, int continus_num);
 	int maxNumContinuousDigits(std::string srcStr);
-	double postcodeStringScore(std::string srcStr, std::string &resultStr);
+	double postcodeStringScore(std::string srcStr, std::string &resultStr, OcrAlgorithm_config *pConfig = nullptr);
 	size_t getFirstContinuousDigits(std::string srcStr, int conti_num, std::string &dstStr);
 	
 
@@ -219,11 +187,102 @@ public:
 	OCRArbitaryTag();
 
 	std::string get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_config *pConfig);
+	std::string get_last_log();
+	std::string get_last_full_ocr_data();
+
 private:
-
-
+	std::string log_str;
+	std::string m_results;
 	int _run_ocr(cv::Mat post_code_line, std::string &results, OcrAlgorithm_config *pConfig);
 
 	std::string format_results(std::string res_str);
 
 };
+
+
+struct DigitClassRes
+{
+	int class_ind;
+	float confidence;
+};
+
+
+
+
+
+class OCRHandWriteBox
+{
+public:
+	OCRHandWriteBox();
+	int initial_model(const wchar_t* model_file,float thresh_conf= 0.9, size_t cuda_id =0);
+
+	//正常函数
+	std::string get_postcode_string(cv::Mat tag_mat);
+
+	std::string get_last_log();
+
+	int find_key_words(cv::Mat tag_mat, std::vector<std::string>& key_words, void*pTess=NULL);
+public:
+	//用于检测“没有框”的手写数字
+	std::string get_postcode_string_test(cv::Mat tag_mat);
+
+private:
+	int getPostCodeLine_nobox(const cv::Mat &srcMat, std::vector<cv::Mat> &toMats, std::vector<cv::Mat> &fromMats);
+	int getHandWriteRange(const cv::Mat &srcMat, cv::Rect &srcRect, cv::Rect &dstRect, bool &need_rotate);
+	int split_digits_nobox(cv::Mat &srcMat, std::vector<cv::Mat> &dstDigits);
+	int score_for_rect(std::vector<cv::Rect> rcs, int im_width, int im_height, std::vector<float> &rc_scores);
+	int getPostCode_nobox(std::vector<cv::Mat> &srcMat_vec, std::vector<std::string> &result_str, \
+		std::vector<float> &confidence);
+
+	//测试2
+public:
+	//用于识别没有“明显框”的手写数字
+	std::string get_postcode_string_test_v2(const cv::Mat &tag_mat);
+
+
+	int identify_handbox_type(const cv::Mat &srcm); //0，不是手写框，1，是不带边框，2是带边框
+
+
+private:
+	//获得五个手写小方格，包括外边框
+	int get_handwrite_square_boxes(cv::Mat &src_mat, std::vector<cv::Mat> &square_boxes);//获得手写框，带边框
+	
+	//从方框中获得手写数字（去除黑边），白底黑字
+	int remove_box_border(cv::Mat &src_mat);
+	
+	// onnxruntime 分类模型，白底，黑字
+	std::string ocr_with_classifier(std::vector<cv::Mat> &srcms, float *conf=NULL);
+
+
+	std::string ocr_with_tesseract(std::vector<cv::Mat> &srcms); //弃用
+
+	float m_threshold_confidence;
+	std::string log_str;
+
+private:
+	static const int MAX_IMAGE_NUM = 5;
+	static const int WIDTH_ = 32;
+	static const int HEIGHT_ = 32;
+	static const int CHANNEL_ = 1;
+
+	Ort::Env env;
+	Ort::SessionOptions session_options;
+
+	std::vector<const char*> input_node_names = { "input" };
+	std::vector<const char*> output_node_names = { "output" };
+
+
+	Ort::Value input_tensor_{ nullptr };
+	std::array<int64_t, 4> input_shape_{ MAX_IMAGE_NUM, CHANNEL_, HEIGHT_, WIDTH_ };
+
+
+	Ort::Session *m_pSession;
+	std::array<float, MAX_IMAGE_NUM * WIDTH_ * HEIGHT_ * CHANNEL_> *input_image_ = NULL;
+
+
+
+};
+
+
+
+

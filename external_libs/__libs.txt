@@ -24,7 +24,8 @@ wavelet2dd.lib
 ## onnxruntime
 onnxruntime.lib
 
-
+##logger
+spdlog.lib
 ####################################[Release]:
 
 ## tesseract
@@ -56,5 +57,6 @@ onnxruntime.lib
 ## barcode
 ZXing.lib
 
-
+##logger
+spdlog.lib
 

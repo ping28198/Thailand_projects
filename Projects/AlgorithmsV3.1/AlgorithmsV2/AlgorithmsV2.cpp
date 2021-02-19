@@ -5,14 +5,14 @@
 #include <iostream>
 #include <opencv2//opencv.hpp>
 #include "CommonFunc.h"
-#include "PostcodeAlgorithm.h"
+#include "PostcodeAlgorithm_v1.h"
 #include <algorithm>
 #include <fstream>
 using namespace std;
 using namespace cv;
 
 
-//#define SHOW_IMAGE_TEST
+#define SHOW_IMAGE_TEST
 
 int format_tess_config_file(string cfg_file_path)
 {
@@ -73,7 +73,7 @@ int format_tess_config_file(string cfg_file_path)
 void test_tag_ocr()
 {
 
-	string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag\\*.jpg";
+	string dir = "E:\\datasets\\ThailandPost\\cuts_0_1\\*.jpg";
 	string match_line_img = "E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg";
 	string exe_dir = CommonFunc::get_exe_dir();
 	std::cout << "image dir:" << dir << std::endl;
@@ -108,7 +108,7 @@ void test_tag_ocr()
 
 	int configs_size = 1;
 	tesseract::TessBaseAPI tess;
-	if (tess.Init((exe_dir + "/tessdata").c_str(), "digits", tesseract::OcrEngineMode::OEM_LSTM_ONLY, configs, configs_size, NULL, NULL, false))
+	if (tess.Init((exe_dir + "/tessdata").c_str(), "digits", tesseract::OcrEngineMode::OEM_LSTM_ONLY, nullptr, 0, NULL, NULL, false))
 	{
 #ifdef _DEBUG
 		std::cout << "OCRTesseract: Could not initialize tesseract." << std::endl;
@@ -118,24 +118,27 @@ void test_tag_ocr()
 
 	cfg.pTessEn = &tess;
 
-	cfg.match_data.getMatchDataFromImg_tag_line("E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg");
+	cfg.match_data.getMatchDataFromImg_tag_line("E:\\cpp_projects\\Thailand_project\\Projects\\_run_dir\\resource\\match_line_image.jpg");
 
-
-
-
+	cfg.strict_mode = 0;
+	cfg.support_postcode_10 = 0;
 
 	int i = 0;
 	for (i = 0; i < imgs.size(); i++)
 	{
 		cout << i << "/" << imgs.size() << endl;
 		cv::Mat srcm = imread(imgs[i]);
+		t0 = clock();
 		string s = stocr.get_postcode_string(srcm, &cfg);
+		t1 = clock();
+		std::cout << "time consume:" << t1 - t0 << std::endl;
 		cv::Mat dstm;
 		//stocr.loacate_anchor_line(srcm, dstm, match_line_mat);
 
 		cout << "结果："<<s << endl;
+		cout << stocr.get_last_log() << endl;
 
-#ifdef POSTCODE_ROI_DEBUG
+#ifdef DEBUG_STD_TAG
 		waitKey(0);
 #endif // POSTCODE_ROI_DEBUG
 
@@ -166,23 +169,23 @@ void test_tag_detection()
 	std::string modelfile = CommonFunc::joinFilePath(exe_dir, model_names[image_num - 1]);
 	
 	//modelfile = "E:\\python_projects\\Yet-Another-EfficientDet-Pytorch\\efficientdetd0_one.onnx";
-	modelfile = "E:\\python_projects\\Tailand_tag_detect\\RotatedBoundingBox\\efficientdetd0_one.onnx";
-	int cuda_ind = 0;
+	modelfile = "E:\\cpp_projects\\Thailand_project\\Projects\\_run_dir\\model_file\\efficientdetd0_one.onnx";
+	int cuda_ind = -1;
 
 	std::cout << "model path:" << modelfile << std::endl;
 	wchar_t modelfilew[512] = { 0 };
 	CommonFunc::MCharToWChar(modelfile.c_str(), modelfilew);
-	TagDetector parcelRecop(modelfilew, 0.9, cuda_ind, image_num);
+	TagDetector parcelRecop(modelfilew, 0.75, cuda_ind, image_num);
 	cout << "using cuda:" << cuda_ind << endl;
 	//parcelRecop.set_transform(1., 1., 0, 0);
 	parcelRecop.initial();
 
 	std::string dir = CommonFunc::joinFilePath(exe_dir, "/images/*.jpg");
 	//dir = "F:\\cpte_datasets\\SeperateParcel\\P20200410_images\\*.jpg";
-	dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_obj_datasets_3\\*.jpg";
+	//dir = "E:\\datasets\\ThailandPost\\test_nobox\\CUTs\\*.jpg";
+	dir = "E:\\datasets\\ThailandPost\\src_parcels\\*.jpg";
 
-
-	string saving_dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag_3";
+	string saving_dir = "E:\\datasets\\ThailandPost\\thailand_tag_cuts";
 
 
 	std::cout << "image dir:" << dir << std::endl;
@@ -221,9 +224,6 @@ void test_tag_detection()
 		}
 		//parcelRecop.detect_mats(mats, points);
 
-
-
-
 		parcelRecop.detectParcels(mats, rrects, cls_inds);
 
 		t1 = clock();
@@ -237,17 +237,14 @@ void test_tag_detection()
 
 		for (int j = 0; j < cls_inds[0].size(); j++)
 		{
-			if (cls_inds[0][j] == 2)
+			Mat tag_mat;
+			ImageProcessFunc::getMatFromRotatedRect(mats[0], tag_mat, rrects[0][j]);
+			if (!tag_mat.empty())
 			{
-				Mat tag_mat;
-				ImageProcessFunc::getMatFromRotatedRect(mats[0], tag_mat, rrects[0][j]);
-				if (!tag_mat.empty())
-				{
-					t0 = clock();
-					string name = to_string(t0) + ".jpg";
-					name = CommonFunc::joinFilePath(saving_dir, name);
-					cv::imwrite(name, tag_mat);
-				}
+				t0 = clock();
+				string name = to_string(cls_inds[0][j]) + "_" + to_string(t0) + ".jpg";
+				name = CommonFunc::joinFilePath(saving_dir, name);
+				cv::imwrite(name, tag_mat);
 			}
 		}
 
@@ -319,7 +316,8 @@ void test_tag_detection()
 
 int test_arb_ocr()
 {
-	string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag_3\\*.jpg";
+	//string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag_3\\*.jpg";
+	string dir = "E:\\datasets\\ThailandPost\\tag_cuts_arb\\*.jpg";
 	string match_line_img = "E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg";
 	string exe_dir = CommonFunc::get_exe_dir();
 	std::cout << "image dir:" << dir << std::endl;
@@ -353,6 +351,7 @@ int test_arb_ocr()
 
 	int configs_size = 1;
 	tesseract::TessBaseAPI tess;
+
 	if (tess.Init((exe_dir + "/tessdata").c_str(), "tha", tesseract::OcrEngineMode::OEM_LSTM_ONLY))
 	{
 #ifdef _DEBUG
@@ -365,23 +364,25 @@ int test_arb_ocr()
 
 	//cfg.match_data.getMatchDataFromImg_tag_line("E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg");
 
-
-
-
-
 	int i = 0;
-	for (i = 77; i < imgs.size(); i++)
+	for (i = 0; i < imgs.size(); i++)
 	{
 		cout << i << "/" << imgs.size() << endl;
 		cv::Mat srcm = imread(imgs[i]);
 		cv::imshow("src", srcm);
+
+
+		t0 = clock();
+
 		string ss;
 		ss = stocr.get_postcode_string(srcm, &cfg);
+		t1 = clock();
+		std::cout << "time consume:" << t1 - t0<<std::endl;
 		cv::Mat dstm;
 		//stocr.loacate_anchor_line(srcm, dstm, match_line_mat);
 
 		cout << "结果：" << ss << endl;
-
+		waitKey(0);
 #ifdef ARBITURARY_TAG_DEBUG
 		waitKey(0);
 #endif // POSTCODE_ROI_DEBUG
@@ -389,6 +390,189 @@ int test_arb_ocr()
 	return 1;
 
 }
+
+
+void test_ocr_hand_write_box()
+{
+	//string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag_3\\*.jpg";
+	std::string dir = "E:\\datasets\\ThailandPost\\tag_cuts_hwrt\\*.jpg";
+	//string match_line_img = "E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg";
+	string exe_dir = CommonFunc::get_exe_dir();
+	std::cout << "image dir:" << dir << std::endl;
+	std::vector<std::string> imgs;
+	CommonFunc::getAllFilesNameInDir(dir, imgs, false, true);
+	std::cout << "file nums:" << imgs.size() << std::endl;
+	double total_consume = 0;
+	clock_t t0;
+	clock_t t1;
+	vector<double> time_range;
+	OCRHandWriteBox hwocr;
+	OcrAlgorithm_config cfg;
+	
+	std::string modelfile = "E:\\cpp_projects\\Thailand_project\\Projects\\_run_dir\\model_file\\last.onnx";
+	int cuda_ind = 0;
+
+	std::cout << "model path:" << modelfile << std::endl;
+	wchar_t modelfilew[512] = { 0 };
+	CommonFunc::MCharToWChar(modelfile.c_str(), modelfilew);
+	hwocr.initial_model(modelfilew, 0.9);
+
+
+
+	tesseract::TessBaseAPI tess;
+	if (tess.Init((exe_dir + "/tessdata").c_str(), "eng", tesseract::OcrEngineMode::OEM_LSTM_ONLY))
+	{
+#ifdef _DEBUG
+		std::cout << "OCRTesseract: Could not initialize tesseract." << std::endl;
+#endif // _DEBUG
+		return;
+	}
+
+	std::vector<std::string> keywords = {"to","10"};
+	//ifstream ifs;
+	//ifs.open((exe_dir + "/resource/key words.txt").c_str());
+	
+// 	if (ifs.is_open())
+// 	{
+// 		while (ifs.peek() != EOF)
+// 		{
+// 			char tmpstr[32] = { 0 };
+// 			ifs.getline(tmpstr, 511);
+// 			std::string kstr(tmpstr);
+// 			if (!kstr.empty())
+// 			{
+// 				keywords.push_back(kstr);
+// 				std::cout << "key words:" << kstr << std::endl;
+// 			}
+// 		}
+// 	}
+
+
+	int i = 0;
+	for (i = 0; i < imgs.size(); i++)
+	{
+		cout << i << "/" << imgs.size() << endl;
+		cv::Mat srcm = imread(imgs[i]);
+#ifdef DEBUG_HAND_WRITE_BOX
+		cv::imshow("src", srcm);
+#endif // DEBUG_HAND_WRITE_BOX
+		
+		string ss;
+		std::vector<cv::Mat> pbox;
+		t0 = clock();
+		ss = hwocr.get_postcode_string(srcm);
+		t1 = clock();
+		//stocr.loacate_anchor_line(srcm, dstm, match_line_mat);
+		std::cout << "time consume:" << t1 - t0 << std::endl;
+		cout << "结果：" << ss << endl;
+		std::cout << hwocr.get_last_log() << std::endl;
+
+		int res = hwocr.find_key_words(srcm, keywords, &tess);
+		
+		std::cout <<"find key words:"<< to_string(res) << std::endl;
+
+
+
+#ifdef DEBUG_HAND_WRITE_BOX
+		waitKey(0);
+#endif // DEBUG_HAND_WRITE_BOX
+
+		
+	}
+	return ;
+
+}
+
+
+
+void test_handwirte_box_test()
+{
+
+	//string dir = "F:\\cpte_datasets\\Tailand_tag_detection_datasets\\tag_cut_img\\rotated_tag_3\\*.jpg";
+	std::string dir = "E:\\datasets\\ThailandPost\\tag_cuts_hwrt_box\\*.jpg";
+	//string match_line_img = "E:\\cpp_projects\\Thailand_projects\\Projects\\_run_dir\\resource\\match_line_image.jpg";
+	string exe_dir = CommonFunc::get_exe_dir();
+	std::cout << "image dir:" << dir << std::endl;
+	std::vector<std::string> imgs;
+	CommonFunc::getAllFilesNameInDir(dir, imgs, false, true);
+	std::cout << "file nums:" << imgs.size() << std::endl;
+	double total_consume = 0;
+	clock_t t0;
+	clock_t t1;
+	vector<double> time_range;
+	OCRHandWriteBox hwocr;
+	OcrAlgorithm_config cfg;
+
+	std::string modelfile = "E:\\cpp_projects\\Thailand_project\\Projects\\_run_dir\\model_file\\last.onnx";
+	int cuda_ind = 0;
+
+	std::cout << "model path:" << modelfile << std::endl;
+	wchar_t modelfilew[512] = { 0 };
+	CommonFunc::MCharToWChar(modelfile.c_str(), modelfilew);
+	hwocr.initial_model(modelfilew, 0.9);
+
+
+
+	tesseract::TessBaseAPI tess;
+	if (tess.Init((exe_dir + "/tessdata").c_str(), "eng", tesseract::OcrEngineMode::OEM_LSTM_ONLY))
+	{
+		std::cout << "OCRTesseract: Could not initialize tesseract." << std::endl;
+		return;
+	}
+
+	std::vector<std::string> keywords = { "to","10" };
+
+
+	int i = 0;
+	for (i = 0; i < imgs.size(); i++)
+	{
+		cout << i << "/" << imgs.size() << endl;
+		cv::Mat srcm = imread(imgs[i]);
+		//cv::Mat srcm = imread("E:\\datasets\\ThailandPost\\thailand_tag_cuts\\3_3416.jpg");//2651
+		//cv::Mat srcm = imread("E:\\datasets\\ThailandPost\\thailand_tag_cuts\\3_2651.jpg");//
+#ifdef DEBUG_HAND_WRITE_BOX
+		cv::imshow("src", srcm);
+#endif // DEBUG_HAND_WRITE_BOX
+		int types = hwocr.identify_handbox_type(srcm);
+		string ss;
+		std::vector<cv::Mat> pbox;
+		t0 = clock();
+		if (types==1)
+		{
+			ss = hwocr.get_postcode_string_test_v2(srcm);
+		}
+		else
+		{
+			ss = hwocr.get_postcode_string(srcm);
+		}
+		
+		t1 = clock();
+		//stocr.loacate_anchor_line(srcm, dstm, match_line_mat);
+		std::cout << "time consume:" << t1 - t0 << std::endl;
+		cout << "结果：" << ss << endl;
+		std::cout << hwocr.get_last_log() << std::endl;
+
+// 		int res = hwocr.find_key_words(srcm, keywords, &tess);
+// 
+// 		std::cout << "find key words:" << to_string(res) << std::endl;
+
+
+
+#ifdef DEBUG_HAND_WRITE_BOX
+		waitKey(0);
+#endif // DEBUG_HAND_WRITE_BOX
+
+
+	}
+	return;
+
+
+
+
+
+}
+
+
 
 
 
@@ -400,8 +584,9 @@ int main()
 	cv::Mat m;
 	//test_tag_detection();
 	//test_tag_ocr();
-	test_arb_ocr();
-
+	//test_arb_ocr();
+	//test_ocr_hand_write_box();
+	test_handwirte_box_test();
 
 
 

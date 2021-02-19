@@ -3,7 +3,7 @@
 
 
 
-int ImageProcessFunc::adJustBrightness(cv::Mat& src, double alpha, double beta, double anchor)
+int ImageProcessFunc::adJustBrightness(cv::Mat& src, float alpha, float beta, float anchor)
 {
 	int height = src.rows;
 	int width = src.cols;
@@ -60,7 +60,7 @@ void ImageProcessFunc::rotate_arbitrarily_angle(cv::Mat &src, cv::Mat &dst, floa
 	dst = Mat(dst, rect);
 }
 
-int ImageProcessFunc::sumPixels(cv::Mat &srcimg, int axis, std::vector<unsigned int> &resultsVec)
+int ImageProcessFunc::sumPixels(const cv::Mat &srcimg, int axis, std::vector<unsigned int> &resultsVec)
 {
 	assert(srcimg.channels() == 1);
 	int h = srcimg.rows;
@@ -166,13 +166,12 @@ int ImageProcessFunc::getContourRect(std::vector<cv::Point> & points_vec, cv::Re
 		if (pt.y < tp.y) tp = pt;
 		if (pt.y > bt.y) bt = pt;
 	}
-	int w = rt.x - lf.x+1;
-	int h = bt.y - tp.y+1;
+	int w = rt.x - lf.x + 1;
+	int h = bt.y - tp.y + 1;
 	mRect.x = lf.x;
 	mRect.width = w;
 	mRect.y = tp.y;
 	mRect.height = h;
-
 	return 1;
 }
 
@@ -322,6 +321,27 @@ int ImageProcessFunc::rotatePoints(std::vector<cv::Point> & points_vec, double a
 	{
 		points_vec[i].x = round(points_vecf[i].x);
 		points_vec[i].y = round(points_vecf[i].y);
+	}
+	return 1;
+}
+
+int ImageProcessFunc::drawRotateRect(cv::Mat &srcm, const cv::RotatedRect &rc, int thickness, const cv::Scalar &color)
+{
+	cv::Point2f pts[4];
+	rc.points(pts);
+	for (int i=0;i<4;i++)
+	{
+		cv::Point pt1 = pts[i];
+		cv::Point pt2;
+		if (i==3)
+		{
+			pt2 = pts[0];
+		}
+		else
+		{
+			pt2 = pts[i + 1];
+		}
+		cv::line(srcm, pt1, pt2, color, thickness);
 	}
 	return 1;
 }

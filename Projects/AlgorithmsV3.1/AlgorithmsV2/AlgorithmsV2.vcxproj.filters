@@ -24,7 +24,7 @@
     <ClInclude Include="..\..\..\Source_include\ImageProcessFunc.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\Source_include\PostcodeAlgorithm.h">
+    <ClInclude Include="..\..\..\Source_include\PostcodeAlgorithm_v1.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -41,7 +41,7 @@
     <ClCompile Include="..\..\..\Source_include\ImageProcessFunc.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\Source_include\PostcodeAlgorithm.cpp">
+    <ClCompile Include="..\..\..\Source_include\PostcodeAlgorithm_v1.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
