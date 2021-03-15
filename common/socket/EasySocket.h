@@ -187,7 +187,7 @@ namespace SocketLib
     protected:
 
         bool m_connected;               // is the socket connected?
-
+		struct sockaddr_in localinfo;
         struct sockaddr_in m_remoteinfo;// structure containing information
         // about the remote connection
 

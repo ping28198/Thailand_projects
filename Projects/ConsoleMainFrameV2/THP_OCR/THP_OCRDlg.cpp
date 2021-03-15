@@ -75,7 +75,7 @@ CTHPOCRDlg::CTHPOCRDlg(CWnd* pParent /*=nullptr*/)
 
 CTHPOCRDlg::~CTHPOCRDlg()
 {
-	if (pMainWorker) delete pMainWorker;
+	
 }
 
 void CTHPOCRDlg::DoDataExchange(CDataExchange* pDX)
@@ -101,6 +101,7 @@ BEGIN_MESSAGE_MAP(CTHPOCRDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_MODE_NORMAL, &CTHPOCRDlg::OnBnClickedModeNormal)
 	ON_BN_CLICKED(IDC_MODE_TEST, &CTHPOCRDlg::OnBnClickedModeTest)
 	ON_WM_CLOSE()
+	ON_BN_CLICKED(IDC_BUTTON2, &CTHPOCRDlg::OnBnClickedButton2)
 END_MESSAGE_MAP()
 
 
@@ -350,9 +351,28 @@ void CTHPOCRDlg::OnClose()
 	if (i != IDYES)
 	{
 		return;
-		//你自己的代码
 	}
-
+	if (pMainWorker) delete pMainWorker;
 
 	CDialogEx::OnClose();
+}
+
+
+void CTHPOCRDlg::OnBnClickedButton2()
+{
+	// TODO: 在此添加控件通知处理程序代码
+	CString strFile = _T("");
+
+	CFileDialog    dlgFile(TRUE, NULL, NULL, OFN_HIDEREADONLY, _T("Describe Files (*.jpg)|*.jpg|All Files (*.*)|*.*||"), NULL);
+
+	if (dlgFile.DoModal())
+	{
+		strFile = dlgFile.GetPathName();
+		char image_path[512] = {0};
+		CommonFunc::WCharToMChar(strFile.GetBuffer(0), image_path);
+		std::string ss(image_path);
+		pMainWorker->push_debug_image(ss);
+
+	}
+
 }

@@ -1054,7 +1054,6 @@ double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resu
 	//////////////////////////////////////////////////////////////////////////
 //根据设定
 	bool strict_mode = 0;
-	bool support_code_num_4 = 1;
 	bool support_code_num_10 = 0;
 	int std_postcoce_num = 5;
 
@@ -1070,10 +1069,8 @@ double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resu
 	{
 		strict_mode = pConfig->strict_mode;
 		support_code_num_10 = pConfig->support_postcode_10;
-		support_code_num_4 = pConfig->support_postcode_4;
 		std_postcoce_num = pConfig->std_postcode_num;
 	}
-	support_code_num_4 = strict_mode ? 0 : support_code_num_4;
 
 
 	int length_left = std_postcoce_num;
@@ -1099,32 +1096,7 @@ double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resu
 		}
 	}
 
-	if (strict_mode)
-	{
-		size_t _pos = srcStr.find('-');
-		if (_pos != srcStr.npos)
-		{
-			std::string substr1 = srcStr.substr(0, _pos);
-			std::string substr2 = srcStr.substr(_pos + 1);
-			int num = maxNumContinuousDigits(substr1);
-			if (num != std_postcoce_num) return 0;
-			num = maxNumContinuousDigits(substr2);
-			if (num != std_postcoce_num) return 0;
-			return getFirstContinuousDigits(substr2, std_postcoce_num, resultStr);
-		}
-		else
-		{
-			if (support_code_num_10)
-			{
-				int num = maxNumContinuousDigits(srcStr);
-				if (num==10)
-				{
-					return getFirstContinuousDigits(srcStr, 10, resultStr);
-				}
-			}
-			return 0;
-		}
-	}
+
 
 	//////////////////////////////////////////////////////////////////////////
 //有“-”的情况 5+5,5+4的情况,
@@ -1142,8 +1114,8 @@ double OCRStandardTag::postcodeStringScore(std::string srcStr, std::string &resu
 		getFirstContinuousDigits(substr1, length_left, resStr1);
 
 		double score_right_5 = continuousDigitsScore(substr2, length_right_5); 
-		double score_right_4 = 0;
-		if (support_code_num_4)
+		double score_right_4 = 1;
+		if (support_code_num_10)
 		{
 			score_right_4 = continuousDigitsScore(substr2, length_right_4);
 		}
@@ -1305,6 +1277,12 @@ int OCRArbitaryTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAl
 	return 1;
 }
 
+bool _isdigit(int c)
+{
+	return isdigit(c) || c == '-';
+}
+
+
 std::string OCRArbitaryTag::format_results(std::string res_str)
 {
 	int digt_len = 0;
@@ -1322,28 +1300,28 @@ std::string OCRArbitaryTag::format_results(std::string res_str)
 			start = true;
 			continue;
 		}
-		if (start && isdigit(c))
+		if (start && _isdigit(c))
 		{
 			digt_len++;
 			continue;
 		}
 		if ((c == ' ' || c == '\n') && start == true)
 		{
-			if (digt_len == 5)
+			if (digt_len == 5 || digt_len == 10)
 			{
 				postcode = res_str.substr(i - digt_len, digt_len);
 			}
 			digt_len = 0;
 			continue;
 		}
-		if (!isdigit(c))
+		if (!_isdigit(c))
 		{
 			digt_len = 0;
 			start = false;
 		}
 	}
 
-	if (digt_len==5)
+	if (digt_len== 5 || digt_len==10)
 	{
 		postcode = res_str.substr(res_str.size() - digt_len, digt_len);
 	}
@@ -1358,8 +1336,6 @@ OCRHandWriteBox::OCRHandWriteBox()
 
 	auto memory_info = Ort::MemoryInfo::CreateCpu(OrtDeviceAllocator, OrtMemTypeCPU);
 	input_tensor_ = Ort::Value::CreateTensor<float>(memory_info, input_image_->data(), input_image_->size(), input_shape_.data(), input_shape_.size());
-
-
 }
 
 int OCRHandWriteBox::initial_model(const wchar_t* model_file, float thresh_conf, size_t cuda_id)
@@ -2160,7 +2136,7 @@ std::string OCRHandWriteBox::get_postcode_string_test_v2(const cv::Mat &tag_mat)
 // 
 	cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
 	cv::morphologyEx(rsmat, rsmat, cv::MORPH_DILATE, element);
-	element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(9, 9));
+	element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 9));
 	cv::morphologyEx(rsmat, rsmat, cv::MORPH_CLOSE, element);
 
 #ifdef DEBUG_HAND_WRITE_BOX
@@ -2180,7 +2156,7 @@ std::string OCRHandWriteBox::get_postcode_string_test_v2(const cv::Mat &tag_mat)
 	{
 		cv::Rect rc;
 		ImageProcessFunc::getContourRect(contours[i],rc);
-		if (rc.height < rsmat.rows*0.1)
+		if (rc.height < rsmat.rows*0.12)
 		{
 			continue;
 		}
@@ -2215,9 +2191,9 @@ std::string OCRHandWriteBox::get_postcode_string_test_v2(const cv::Mat &tag_mat)
 		if (wr < min_v) min_v = wr;
 		if (wr > max_v) max_v = wr;
 	}
-	if ((max_v - min_v) / (max_v + min_v + 0.0001) > 0.4)
+	if ((max_v - min_v) / (max_v + min_v + 0.0001) > 0.3)
 	{
-		log_str += "digits distance exception,";
+		log_str += "digits horizontal distance exception";
 		return "";
 	}
 	//cv::threshold(graymat, graymat, meanv[0] * 0.65, 255, cv::THRESH_BINARY);
@@ -2641,7 +2617,7 @@ std::string OCRHandWriteBox::ocr_with_classifier(std::vector<cv::Mat> &srcms, fl
 				}
 			}
 			
-			if (confidence<min_conf)
+			if (confidence < min_conf)
 			{
 				min_conf = confidence;
 				low_conf_ind = i;
@@ -2658,7 +2634,7 @@ std::string OCRHandWriteBox::ocr_with_classifier(std::vector<cv::Mat> &srcms, fl
 
 	if (min_conf < m_threshold_confidence)
 	{
-		log_str += "the " + to_string(low_conf_ind+1) +"rd square confidence is low,";
+		log_str += "the " + to_string(low_conf_ind+1) +"rd square confidence is low, possible result:" + res_str;
 		return "";
 	}
 	if (pConf!=NULL)

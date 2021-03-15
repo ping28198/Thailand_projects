@@ -16,6 +16,7 @@
 //#define ARBITURARY_TAG_DEBUG
 //#define USE_CUDA_DEVICE
 //#define DEBUG_HAND_WRITE_BOX
+
 class MatchDataStruct
 {
 public:

@@ -882,13 +882,12 @@ void NetworkClient::client_process_recv(void* p_parent)
 			}
 			catch (Exception& e)
 			{
-				std::cout << e.PrintError() << std::endl;
+				std::cout <<"Bing error: "<< e.PrintError() << std::endl;
 				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 				continue;
 			}
 			binded = 1;
 		}
-
 		try
 		{
 			psocket->Connect(parent->m_dst_address, parent->m_dst_port);
@@ -900,7 +899,7 @@ void NetworkClient::client_process_recv(void* p_parent)
 			}
 			else
 			{
-				std::cout << e.PrintError() << std::endl;
+				std::cout <<"Connection error:"<< e.PrintError() << std::endl;
 				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 				continue;
 			}
@@ -933,7 +932,7 @@ void NetworkClient::client_process_recv(void* p_parent)
 #ifdef DEBUG_NETWORK
 					std::cout <<"lost connection from server, "<< e.PrintError() << std::endl;
 #endif // DEBUG_NETWORK
-
+					//psocket->Close();
 					
 					break;
 				}
@@ -1037,10 +1036,12 @@ void NetworkClient::client_process_recv(void* p_parent)
 		}
 		try
 		{
+			binded = 0;
 			psocket->Close();
 		}
 		catch (Exception&e)
 		{
+			std::cout << "Close error:" << e.PrintError() << std::endl;
 		}
 	}
 }

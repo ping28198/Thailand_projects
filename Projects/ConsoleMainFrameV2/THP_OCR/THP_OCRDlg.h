@@ -71,4 +71,5 @@ public:
 	CStatic st_ok_num_ctr;
 	CStatic st_percent_ctr;
 	afx_msg void OnClose();
+	afx_msg void OnBnClickedButton2();
 };

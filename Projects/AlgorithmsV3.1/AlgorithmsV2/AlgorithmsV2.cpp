@@ -494,7 +494,7 @@ void test_handwirte_box_test()
 	string exe_dir = CommonFunc::get_exe_dir();
 	std::cout << "image dir:" << dir << std::endl;
 	std::vector<std::string> imgs;
-	CommonFunc::getAllFilesNameInDir(dir, imgs, false, true);
+	CommonFunc::getAllFilesNameInDir(dir, imgs, true, true);
 	std::cout << "file nums:" << imgs.size() << std::endl;
 	double total_consume = 0;
 	clock_t t0;
@@ -534,6 +534,7 @@ void test_handwirte_box_test()
 		cv::imshow("src", srcm);
 #endif // DEBUG_HAND_WRITE_BOX
 		int types = hwocr.identify_handbox_type(srcm);
+		std::cout << "hwrt type:" << types << endl;
 		string ss;
 		std::vector<cv::Mat> pbox;
 		t0 = clock();

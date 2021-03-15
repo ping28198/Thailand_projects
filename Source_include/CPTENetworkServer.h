@@ -22,7 +22,7 @@ typedef unsigned int client_id;
 #define CHINA_POST_PROTO 1
 #define SF_EXPRESS_PROTO 0
 
-//#define DEBUG_NETWORK
+#define DEBUG_NETWORK
 
 //�첽��Ϣ������ȡ
 

@@ -266,12 +266,14 @@ namespace SocketLib
 			}
 		}
 
-		struct sockaddr_in localinfo;
+		
 		localinfo.sin_family = AF_INET;
 		localinfo.sin_port = htons(p_port);
 		localinfo.sin_addr.s_addr = (p_addr.empty()) ? htonl(INADDR_ANY) : inet_addr(p_addr.c_str());
 		
-		int err = bind(m_sock, (struct sockaddr*)&localinfo, sizeof(struct sockaddr));
+		int err = ::bind(m_sock, (struct sockaddr*)&localinfo, sizeof(struct sockaddr));
+
+
 
 		if (err == -1)
 		{

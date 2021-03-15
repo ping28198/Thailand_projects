@@ -234,7 +234,7 @@ public:
 	void reset_count();
 
 
-
+	void push_debug_image(const std::string &postcode);
 
 
 	std::string _convert_task2msg(TaskData*ptask);

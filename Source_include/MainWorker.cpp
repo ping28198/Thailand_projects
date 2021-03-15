@@ -799,7 +799,7 @@ void OCR_MainWoker::thread_ocr_std_tag(OCR_MainWoker* parent)
 		if (!postcode.empty())
 		{
 
-			if (parent->m_param.support_code_num_10 && postcode.find('-') == std::string::npos)
+			if (postcode.length()==10 && parent->m_param.support_code_num_10 && postcode.find('-') != std::string::npos)
 			{
 
 			}
@@ -807,15 +807,16 @@ void OCR_MainWoker::thread_ocr_std_tag(OCR_MainWoker* parent)
 			{
 				postcode = postcode.substr(postcode.size() - 5);
 			}
+
+
 			ptask->m_chsOcrPostcode = postcode;
 			ptask->m_postcode_of_tag_type = TAG_INDEX::STD_TAG;
 			ptask->m_postcodeNum = 1;
-			
-			//std::cout << "thread ocr std tag: get a postcode:" <<s<< std::endl;
+
 		}
 		else
 		{
-			//cv::imwrite(exe_dir + "\\saved_file\\" + std::to_string(noread_num % 5000) + ".jpg", std_tag_m);
+			cv::imwrite(exe_dir + "\\saved_file\\" + std::to_string(noread_num % 5000) + ".jpg", std_tag_m);
 			logger->debug("thread ocr std tag: get no postcode, {}", stocr.get_last_log());
 			noread_num += 1;
 		}
@@ -881,7 +882,7 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 	OCRArbitaryTag arbocr;
 	OcrAlgorithm_config cfg;
 	cfg.strict_mode = parent->m_param.use_strict_mode;
-
+	bool support_10bit = parent->m_param.support_code_num_10;
 	int configs_size = 1;
 	tesseract::TessBaseAPI tess;
 	if (tess.Init((exe_dir + "/tessdata").c_str(), "tha", tesseract::OcrEngineMode::OEM_LSTM_ONLY))
@@ -897,6 +898,7 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 	std::vector<std::string> keywords;
 	std::ifstream ifs;
 	ifs.open((exe_dir + "/resource/key words.txt").c_str());
+	int noread_num = 0;
 
 	if (ifs.is_open())
 	{
@@ -944,7 +946,7 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 					ptask->m_image_id_num, ptask->m_sub_task_id);
 			}
 			
-			if (!ss.empty())
+			if (ss.length() == 5 || (ss.length() == 10 && support_10bit))
 			{
 				ptask->m_postcodeNum = 1;
 				ptask->m_chsOcrPostcode = ss;
@@ -977,7 +979,7 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 					ptask->m_image_id_num, ptask->m_sub_task_id);
 			}
 
-			if (!ss.empty())
+			if (ss.length()==5 || (ss.length()==10 && support_10bit))
 			{
 				std::string ocrdata = arbocr.get_last_full_ocr_data();//通过关键字判断是否是收件信息
 				bool is_recv = false;
@@ -990,13 +992,19 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 						break;
 					}
 				}
-				if (is_recv)
+				if (is_recv || parent->m_param.is_test_mode)
 				{
 					ptask->m_postcodeNum = 1;
 					ptask->m_chsOcrPostcode = ss;
 					ptask->m_postcode_of_tag_type = TAG_INDEX::ARB_TAG;
 					std::cout << "Thread ocr arb tag: get a arb tag postcode: " << ss << std::endl;
 				}
+			}
+			else
+			{
+				cv::imwrite(exe_dir + "\\saved_file\\arb_" + std::to_string(noread_num % 100) + ".jpg", arb_tag_m);
+				logger->debug("thread ocr std tag: get no postcode, {}", arbocr.get_last_log());
+				noread_num += 1;
 			}
 
 		}
@@ -1023,7 +1031,7 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 						ptask->m_image_id_num, ptask->m_sub_task_id);
 				}
 
-				if (!postcode.empty())
+				if (postcode.length() == 5 || (support_10bit && postcode.length() == 10))
 				{
 					ptask->m_postcodeNum = 1;
 					ptask->m_chsOcrPostcode = postcode;
@@ -1052,7 +1060,7 @@ void OCR_MainWoker::thread_ocr_hwrt_box(OCR_MainWoker* parent)
 	std::cout << "handwrite ocr model path:" << modelfile << std::endl;
 	wchar_t modelfilew[512] = { 0 };
 	CommonFunc::MCharToWChar(modelfile.c_str(), modelfilew);
-	hwocr.initial_model(modelfilew, 0.9);
+	hwocr.initial_model(modelfilew, 0.3);
 
 	tesseract::TessBaseAPI tess;
 	if (tess.Init((exe_dir + "/tessdata").c_str(), "eng", tesseract::OcrEngineMode::OEM_LSTM_ONLY))
@@ -1062,7 +1070,7 @@ void OCR_MainWoker::thread_ocr_hwrt_box(OCR_MainWoker* parent)
 
 	std::vector<std::string> keywords = { "to","10" };
 
-
+	int noread_num = 0;
 	//等待完成
 	while (true)
 	{
@@ -1150,6 +1158,14 @@ void OCR_MainWoker::thread_ocr_hwrt_box(OCR_MainWoker* parent)
 				{
 					std::string log_str = hwocr.get_last_log();
 					std::cout << "logstr:" << log_str << std::endl;
+					logger->debug("imageid:{}/subid:{}, hwrt box ocr no res:{}", \
+						ptask->m_image_id_num, ptask->m_sub_task_id, log_str);
+				}
+				if (!hwer.empty() && ocr_res.empty())
+				{
+					cv::imwrite(exe_dir + "\\saved_file\\box_" + std::to_string(noread_num) + ".jpg", hwer);
+					noread_num += 1;
+					if (noread_num > 100) noread_num = 0;
 				}
 			}
 		}
@@ -1375,6 +1391,30 @@ void OCR_MainWoker::reset_count()
 {
 	total_task_num = 0;
 	ocr_ok_num = 0;
+}
+
+void OCR_MainWoker::push_debug_image(const std::string &postcode)
+{
+	TaskData *ptask = new TaskData();
+	ptask->m_image_id_num = 999999;
+	ptask->m_image_total_num = 1;
+	ptask->m_enImageView = IMAGE_VIEW_INDEX::TOP;
+	ptask->m_sub_task_id = 0;
+	ptask->m_task_id = 99999999;
+	ptask->m_time_start = stl::time::tick();
+	ptask->m_time_load_image = stl::time::tick();
+	
+	cv::Mat m = cv::imread(postcode);
+	if (m.empty())
+	{
+		std::cout << "image load is empty, :"<<postcode<<std::endl;
+		return;
+	}
+	ptask->pSrcMat = new cv::Mat(m);
+
+	this->_start_one_task(ptask);
+	this->_update_one_task_sp(ptask, PROCESS_STATE::CUT_PARCEL);
+
 }
 
 TaskData* merge_same_type_task(std::vector<TaskData*> tasks)
