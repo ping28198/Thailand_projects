@@ -31,7 +31,8 @@ int importMat_(void *p_args)
 	cv::Mat m;
 	cv::cvtColor(srcm, m, COLOR_BGR2GRAY);
 	cv::resize(m, m, cv::Size(args->new_width, args->new_height), 0, 0, cv::INTER_AREA);
-	
+// 	auto clahe = cv::createCLAHE(3, cv::Size(16, 16));
+// 	clahe->apply(m,m);
 
 	cv::copyMakeBorder(m, m, (args->height_ - args->new_height + 1) / 2, (args->height_ - args->new_height) / 2,
 		(args->width_ - args->new_width + 1) / 2, (args->width_ - args->new_width) / 2, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
@@ -412,6 +413,10 @@ std::string OCRStandardTag::get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_co
 	if (res==0 || textrange_mat.empty())
 	{
 		log_str += "do not locate text range,";
+#ifdef DEBUG_STD_TAG
+		cv::waitKey(5);
+#endif // DEBUG_STD_TAG
+
 		return postcodestr;
 	}
 	cv::Mat post_code_line;
@@ -425,6 +430,9 @@ std::string OCRStandardTag::get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_co
 		_run_ocr(post_code_line, postcodestr, pConfig);
 		format_postcode(postcodestr,pConfig);
 	}
+#ifdef DEBUG_STD_TAG
+	cv::waitKey(5);
+#endif // DEBUG_STD_TAG
 	return postcodestr;
 }
 
@@ -2669,4 +2677,341 @@ std::string OCRHandWriteBox::ocr_with_tesseract(std::vector<cv::Mat> &srcms)
 }
 
 
+
+OCRLotteryTag::OCRLotteryTag()
+{
+
+}
+
+std::string OCRLotteryTag::get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_config *pConfig)
+{
+	cv::Mat postcode_line;
+	int res = get_postcode_line(tag_mat, postcode_line);
+	std::string ocr_res;
+	if (res==1 && !postcode_line.empty())
+	{
+		res = _run_ocr(postcode_line, ocr_res, pConfig);
+		if (!ocr_res.empty())
+		{
+			ocr_res = format_postcode(ocr_res);
+		}
+		else
+		{
+			log_str += "ocr result is empty!";
+		}
+	}
+	else
+	{
+		log_str += "not find postcode line; ";
+	}
+#ifdef DEBUG_LOTTERY_TAG
+	cv::waitKey(5);
+#endif // DEBUG_LOTTERY_TAG
+
+	return ocr_res;
+}
+
+std::string OCRLotteryTag::get_last_log()
+{
+	return log_str;
+}
+
+int OCRLotteryTag::get_postcode_line(cv::Mat srcm, cv::Mat &dstm)
+{
+	int dst_width = 720;
+	float scal_ = float(dst_width) / srcm.cols;
+	cv::Mat nmat;
+	cv::Mat gmat;
+	cv::resize(srcm, gmat, cv::Size(), scal_, scal_, cv::INTER_LINEAR);
+	int width = gmat.cols;
+	int height = gmat.rows;
+	if (srcm.channels()==3)
+	{
+		cv::cvtColor(srcm, gmat, cv::COLOR_BGR2GRAY);
+	}
+
+	cv::normalize(gmat, nmat, 255, 0, cv::NORM_MINMAX);
+	//cv::imshow("nmat", nmat);
+	cv::threshold(nmat, nmat, 120, 255, cv::THRESH_BINARY_INV);
+#ifdef DEBUG_LOTTERY_TAG
+	cv::imshow("threshmat", nmat);
+#endif // DEBUG_LOTTERY_TAG
+
+	
+
+	Mat element = cv::getStructuringElement(cv::MORPH_RECT, Size(35, 3));
+	cv::morphologyEx(nmat, nmat, cv::MORPH_CLOSE, element, cv::Point(-1, -1), 1, 0, 0);
+	element = cv::getStructuringElement(cv::MORPH_RECT, Size(3, 3));
+	cv::morphologyEx(nmat, nmat, cv::MORPH_ERODE, element);
+	
+#ifdef DEBUG_LOTTERY_TAG
+	cv::imshow("bnmat_contour", nmat);
+#endif // DEBUG_LOTTERY_TAG
+
+	
+
+
+	// 查找轮廓
+	std::vector<std::vector<cv::Point>> contours;
+	cv::findContours(nmat, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+	std::vector<std::vector<cv::Point>> contours_cand;
+
+	//过滤轮廓-宽高比，尺寸过滤
+	//std::vector<cv::Point> tl_pt;
+	std::vector<std::vector<cv::Point>>::iterator it;
+	std::vector<std::vector<std::vector<cv::Point>>::iterator> its;
+	for (it = contours.begin(); it != contours.end(); it++)
+	{
+		cv::Rect rc;
+		int res = ImageProcessFunc::getContourRect(*it, rc); 
+		if(rc.width<100 ||rc.height<20) continue;
+		if (rc.width > 0.35*width && rc.height > 0.0666*width && rc.width < 0.7*width &&
+			rc.x < 0.25*width && rc.y < 0.75*height && rc.y > 0.2*height)
+		{
+			contours_cand.push_back(*it);
+		}
+	}
+
+	if (contours_cand.empty())
+	{
+		log_str += "can not find center barcode; ";
+		return 0;
+	}
+
+	for (it = contours_cand.begin(); it != contours_cand.end(); it++)
+	{
+		cv::Rect rc;
+		cv::RotatedRect rrc = cv::minAreaRect(*it);
+		double wrh = std::max(rrc.size.width, rrc.size.height) / std::min(rrc.size.width, rrc.size.height);
+		if (contourArea(*it) / rrc.size.area() < 0.94 || wrh < 5 || wrh > 8)
+		{
+			it = contours_cand.erase(it);
+		}
+// 		std::cout<< (contourArea(*it) / rrc.size.area())<<std::endl;
+// 		std::cout << wrh << std::endl;
+	}
+
+	// 确定条形码位置
+	int centpos_y = height;
+	int ind = -1;
+	cv::Rect barcode_rc;
+
+	for (int i=0;i< contours_cand.size();i++)
+	{
+		cv::Rect rc;
+		int res = ImageProcessFunc::getContourRect(contours_cand[i], rc);
+		int pos_y = std::abs(rc.x + rc.height / 2 - height/2); //靠近中间
+		if (pos_y < centpos_y)
+		{
+			ind = i;
+			centpos_y = pos_y;
+			barcode_rc = rc;
+		}
+	}
+
+	if (ind == -1)
+	{
+		log_str += "Can not find center barcode; ";
+		return 0;
+	}
+	
+    // 定位邮编行
+	//cv::rectangle(nmat, barcode_rc, cv::Scalar(150, 150, 150), 2);
+	//cv::imshow("barcode", nmat);
+	
+
+	cv::RotatedRect barcode_rrect = cv::minAreaRect(contours_cand[ind]);
+	
+
+	if (barcode_rrect.angle < -45 || barcode_rrect.angle > 45)
+	{
+		int a = barcode_rrect.size.width;
+		barcode_rrect.size.width = barcode_rrect.size.height;
+		barcode_rrect.size.height = a;
+	}
+
+	cv::Rect postcode_range_rc(barcode_rrect.center.x-barcode_rrect.size.width/2, 
+		barcode_rrect.center.y - barcode_rrect.size.height / 2, 
+		barcode_rrect.size.width, barcode_rrect.size.height);
+
+	postcode_range_rc.y -= postcode_range_rc.height; 
+	postcode_range_rc.width += postcode_range_rc.x;
+	postcode_range_rc.x = 0;
+	
+	
+	cv::Rect postcode_rc;
+	ind = -1;
+	for (it = contours.begin(); it != contours.end(); it++)
+	{
+		cv::Rect rc;
+		int res = ImageProcessFunc::getContourRect(*it, rc);
+		if (rc.width < 12 || rc.height < 12) continue;
+
+		cv::RotatedRect rrc = cv::minAreaRect(*it);
+
+		if (rrc.angle < -45 || rrc.angle > 45)
+		{
+			int a = rrc.size.width;
+			rrc.size.width = rrc.size.height;
+			rrc.size.height = a;
+		}
+
+		rc = cv::Rect(rrc.center.x - rrc.size.width / 2,
+			rrc.center.y - rrc.size.height / 2,
+			rrc.size.width, rrc.size.height);
+
+		if (rc.y> postcode_range_rc.y && rc.y < (postcode_range_rc.y+postcode_range_rc.height) &&
+			(rc.y + rc.height) > postcode_range_rc.y && (rc.y + rc.height) < (postcode_range_rc.y + postcode_range_rc.height) &&
+			rc.x + rc.width < postcode_range_rc.x + postcode_range_rc.width)
+		{
+			ind = 0;
+			postcode_rc = rc;
+		}
+	}
+	if (ind == -1)
+	{
+		log_str += "can not find postcode range; ";
+		return 0;
+	}
+
+	postcode_rc.x -= 5;
+	postcode_rc.y -= 5;
+	postcode_rc.width += 10;
+	postcode_rc.height += 10;
+
+	ImageProcessFunc::CropRect(cv::Rect(0, 0, nmat.cols, nmat.rows), postcode_rc);
+
+	//定位邮编行
+	cv::rectangle(nmat, postcode_rc, cv::Scalar(150, 150, 150), 2);
+	//cv::imshow("postcode_range", nmat);
+
+	cv::Mat postcodemat;
+
+	gmat(postcode_rc).copyTo(dstm);
+
+#ifdef DEBUG_LOTTERY_TAG
+	cv::imshow("postcode", dstm);
+#endif // DEBUG_LOTTERY_TAG
+
+
+	return 1;
+}
+
+int OCRLotteryTag::_run_ocr(cv::Mat post_code_line, std::string &results, OcrAlgorithm_config *pConfig)
+{
+	if (post_code_line.empty())
+	{
+		log_str += "tag mat is empty, ";
+		return 0;
+	}
+
+
+	Mat srcm;
+	post_code_line.copyTo(srcm);
+	if (srcm.channels() == 3)
+	{
+		cv::cvtColor(srcm, srcm, COLOR_BGR2GRAY);
+	}
+
+	cv::Rect mR(0,0,srcm.cols,srcm.rows);
+
+
+	cv::normalize(srcm, srcm, 255, 0, cv::NORM_MINMAX);
+
+	double vPix = ImageProcessFunc::getAveragePixelInRect(srcm, mR);
+	double anchor = 120;
+	double alpha = 3.0;
+	double beta = 200 - vPix;
+
+	ImageProcessFunc::adJustBrightness(srcm, alpha, beta, anchor);
+
+	//cv::threshold(resizedMat, resizedMat, vPix*0.6, 255, cv::THRESH_BINARY);
+#ifdef DEBUG_LOTTERY_TAG
+	imshow("_runOcr调整亮度后", srcm);
+#endif // OCR_DEBUG
+	int w = srcm.cols;
+	int h = srcm.rows;
+	unsigned char *pImgData = srcm.data;
+
+	//cout << "h" << w << endl;
+
+	tesseract::TessBaseAPI* pTess = (tesseract::TessBaseAPI*)pConfig->pTessThld;
+	if (pTess == NULL)
+	{
+		log_str += "tesseract pointer is Null,";
+		return 0;
+	}
+	pTess->SetPageSegMode(tesseract::PageSegMode::PSM_SINGLE_LINE);
+	//pTess->SetVariable("save_best_choices", "T");
+	pTess->SetImage(pImgData, w, h, srcm.channels(), srcm.step1());
+	pTess->SetVariable("user_defined_api", "72");
+	pTess->Recognize(0);
+
+	// get result and delete[] returned char* string
+#ifdef DEBUG_LOTTERY_TAG
+	std::cout << std::unique_ptr<char[]>(pTess->GetUTF8Text()).get() << std::endl;
+#endif // OCR_DEBUG
+	//
+
+	char *res_data = NULL;
+	res_data = pTess->GetUTF8Text();
+	//pTess->GetUNLVText();
+	//std::cout <<"strlen:"<< strlen(res_data) << std::endl;
+	//std::cout << res_data << std::endl;
+	int str_len = strlen(res_data);
+	size_t max_lenth = std::min(str_len, 64);
+	results = std::string(res_data, max_lenth);
+
+	if (res_data != NULL)
+		delete[] res_data;
+	return 1;
+}
+
+std::string OCRLotteryTag::format_postcode(std::string &res_str)
+{
+
+	int digt_len = 0;
+	string postcode;
+	bool start = true;
+	for (int i = res_str.size() / 2; i < res_str.size(); i++)
+	{
+		unsigned char c = res_str.at(i);
+		if (c == '.' || c == ',')
+		{
+			c = ' ';
+		}
+		if ((c == ' ' || c == '\n') && start == false)
+		{
+			start = true;
+			continue;
+		}
+		if (start && _isdigit(c))
+		{
+			digt_len++;
+			continue;
+		}
+		if ((c == ' ' || c == '\n') && start == true)
+		{
+			if (digt_len == 5)
+			{
+				postcode = res_str.substr(i - digt_len, digt_len);
+			}
+			digt_len = 0;
+			continue;
+		}
+		if (!_isdigit(c))
+		{
+			digt_len = 0;
+			start = false;
+		}
+	}
+
+	if (digt_len == 5 )
+	{
+		postcode = res_str.substr(res_str.size() - digt_len, digt_len);
+	}
+	return postcode;
+
+}
 

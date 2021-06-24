@@ -54,7 +54,7 @@ struct sysParameter
 	int is_ocr_window_tag=1;
 	int is_ocr_handwrite=1;
 	int is_ocr_10bit_pcode=0;
-	
+	int is_ocr_lottery_tag = 1;
 	//邮编设置相关
 	int use_strict_mode = 0;//使用严格模式，邮编的校验更加严格，不支持4位邮编
 
@@ -94,6 +94,7 @@ enum TAG_INDEX
 	ARB_TAG=2,
 	HDW_BOX=3,
 	WIN_TAG=4,
+	LOT_TAG=5, //彩票
 };
 
 enum IMAGE_VIEW_INDEX
@@ -108,7 +109,7 @@ enum IMAGE_VIEW_INDEX
 
 
 static const ulong PROCESS_BASE_NUM = 1;
-
+static int FLAG_POS = 1;
 enum PROCESS_STATE
 {
 	OPEN				 = PROCESS_BASE_NUM << 1,
@@ -121,9 +122,10 @@ enum PROCESS_STATE
 	OCR_ARB_TAG			 = PROCESS_BASE_NUM << 8,
 	OCR_WIN_TAG			 = PROCESS_BASE_NUM << 9,
 	OCR_HANDWRITE_BOX	 = PROCESS_BASE_NUM << 10,
-	PACKAGE				 = PROCESS_BASE_NUM << 11,
-	SEND_TASK			 = PROCESS_BASE_NUM << 12,
-	CLOSE				 = PROCESS_BASE_NUM << 13,
+	OCR_LOTTERY_TAG		 = PROCESS_BASE_NUM << 11,
+	PACKAGE				 = PROCESS_BASE_NUM << 12,
+	SEND_TASK			 = PROCESS_BASE_NUM << 13,
+	CLOSE				 = PROCESS_BASE_NUM << 14,
 };
 
 class TaskData
@@ -165,16 +167,17 @@ public:
 	cv::Mat* parcelMat=nullptr;
 
 	//目标检测结果
-	int m_is_get_std_tag=0;//0,1
+	int m_is_get_std_tag=0; // 0,1
 	cv::RotatedRect m_rc_std_tag;
-	int m_is_get_win_tag=0;//0,1
+	int m_is_get_win_tag=0; // 0,1
 	cv::RotatedRect m_rc_window_tag;
-	int m_is_get_arb_tag=0; //0,1,2
+	int m_is_get_arb_tag=0; // 0,1,2
 	cv::RotatedRect m_rc_arb_tag[2];
-	int m_is_get_hwrt_tag=0;//0,1,2
+	int m_is_get_hwrt_tag=0; // 0,1,2
 	cv::RotatedRect m_rc_hwrite_tag[2];
 
-
+	int m_is_get_lottery_tag = 0; // 0,1
+	cv::RotatedRect m_rc_lottery_tag; 
 
 
 // 	~TaskData()

@@ -16,7 +16,7 @@
 
 void test_cutparcel()
 {
-	std::vector<std::string> flist = ccutil::findFiles("E:\\datasets\\ThailandPost\\test_nobox\\CUTs","*.jpg",false,true);
+	std::vector<std::string> flist = ccutil::findFiles("E:\\datasets\\ThailandPost\\10bitpostcode\\notgood3-3","*.jpg",false,true);
 	CutParcelBox parcel;
 	std::string savedir = "E:\\datasets\\ThailandPost\\tag_cuts_hwrt";
 	for (int i=0;i<flist.size();i++)
@@ -82,8 +82,8 @@ int main()
 {
 
 	//auto rotating_logger = spdlog::daily_logger_mt("daily_logger", "logs/daily.txt", 2, 30);
-	test_mainworker();
-	//test_cutparcel();
+	//test_mainworker();
+	test_cutparcel();
 	return 0;
 
 

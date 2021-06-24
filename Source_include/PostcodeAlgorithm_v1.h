@@ -16,7 +16,7 @@
 //#define ARBITURARY_TAG_DEBUG
 //#define USE_CUDA_DEVICE
 //#define DEBUG_HAND_WRITE_BOX
-
+// #define DEBUG_LOTTERY_TAG
 class MatchDataStruct
 {
 public:
@@ -287,3 +287,23 @@ private:
 
 
 
+class OCRLotteryTag
+{
+public:
+	OCRLotteryTag();
+
+	std::string get_postcode_string(cv::Mat tag_mat, OcrAlgorithm_config *pConfig);
+	std::string get_last_log();
+
+private:
+	std::string log_str;
+	int get_postcode_line(cv::Mat srcm, cv::Mat &dstm);
+
+	int _run_ocr(cv::Mat post_code_line, std::string &results, OcrAlgorithm_config *pConfig);
+
+	std::string format_postcode(std::string &results);
+	
+
+	
+
+};

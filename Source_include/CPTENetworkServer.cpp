@@ -632,9 +632,13 @@ int NetworkServer::_push_one_message(std::string msg, client_id cid)
 int NetworkServer::_acquire_one_message(std::string &msg, client_id cid)
 {
 	std::unique_lock <std::mutex> lck(this->m_mutex_send);
-	while (m_flag_message_send[cid] == 0)
+	while (m_flag_message_send[cid] == 0 && is_running)
 	{
 		this->m_cond_var_send.wait(lck);
+	}
+	if (!is_running)
+	{
+		return 0;
 	}
 	m_flag_message_send[cid] -= 1;
 	if (m_flag_message_send[cid] < 0) m_flag_message_send[cid] = 0;
@@ -734,6 +738,8 @@ NetworkClient::~NetworkClient()
 	{
 		m_pSocket->Close();
 	}
+	m_cond_var_recv.notify_all();
+	m_cond_var_send.notify_all();
 	if (pMainwoker_recv != nullptr)
 	{
 		delete pMainwoker_recv;
@@ -751,9 +757,13 @@ NetworkClient::~NetworkClient()
 int NetworkClient::recv_message(std::string &dst)
 {
 	std::unique_lock <std::mutex> lck(this->m_mutex_recv);
-	while (m_messages_recv.empty())
+	while (m_messages_recv.empty() && m_is_running)
 	{
 		m_cond_var_recv.wait(lck);
+	}
+	if (!m_is_running)
+	{
+		return 0;
 	}
 	dst = m_messages_recv.front();
 	m_messages_recv.erase(m_messages_recv.begin());
@@ -805,9 +815,13 @@ int NetworkClient::_push_one_message(std::string &msg)
 int NetworkClient::_acquire_one_message(std::string &msg)
 {
 	std::unique_lock <std::mutex> lck(this->m_mutex_send);
-	while (m_messages_send.empty())
+	while (m_messages_send.empty() && m_is_running)
 	{
 		m_cond_var_send.wait(lck);
+	}
+	if (!m_is_running)
+	{
+		return 0;
 	}
 	msg = m_messages_send.front();
 	m_messages_send.erase(m_messages_send.begin());
@@ -913,6 +927,7 @@ void NetworkClient::client_process_recv(void* p_parent)
 			while (true)
 			{
 				int res = 0;
+
 				try
 				{
 					try_times += 1;

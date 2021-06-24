@@ -32,7 +32,7 @@ class NetworkServer
 // �ⲿ�߳�ʹ��
 public:
 	NetworkServer(uint16_t in_port);
-	NetworkServer(uint16_t in_port,std::string start_c,std::string end_c,int protocol=0); //0：顺丰，1：邮政
+	NetworkServer(uint16_t in_port,std::string start_c= ":",std::string end_c= "\x0D\x0A",int protocol=0); //0：顺丰，1：邮政
 	~NetworkServer();
 	int recv_one_message(std::string &dst,client_id &cid);
 	int recv_one_message_no_block(std::string &dst, client_id &cid);

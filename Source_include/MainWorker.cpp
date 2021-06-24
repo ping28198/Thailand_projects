@@ -589,6 +589,15 @@ void OCR_MainWoker::thread_detect_tags(OCR_MainWoker* parent, int thread_id)
 				}
 				break;
 			}
+			case TAG_INDEX::LOT_TAG:
+			{
+				if (!ptask->m_is_get_lottery_tag)
+				{
+					ptask->m_is_get_lottery_tag = 1;
+					ptask->m_rc_lottery_tag = rrects[0][i];
+				}
+				break;
+			}
 			default:
 				break;
 			}
@@ -603,29 +612,37 @@ void OCR_MainWoker::thread_detect_tags(OCR_MainWoker* parent, int thread_id)
 		}
 		else
 		{
-			if (ptask->m_is_get_win_tag && parent->m_param.is_ocr_window_tag)
+			if (ptask->m_is_get_lottery_tag && parent->m_param.is_ocr_lottery_tag)
 			{
-				parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_WIN_TAG);
+				parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_LOTTERY_TAG);
 			}
 			else
 			{
-				if (ptask->m_is_get_arb_tag && parent->m_param.is_ocr_arb_tag)
+				if (ptask->m_is_get_win_tag && parent->m_param.is_ocr_window_tag)
 				{
-					parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_ARB_TAG);
+					parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_WIN_TAG);
 				}
 				else
 				{
-					if (ptask->m_is_get_hwrt_tag && parent->m_param.is_ocr_handwrite)
+					if (ptask->m_is_get_arb_tag && parent->m_param.is_ocr_arb_tag)
 					{
-						parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_HANDWRITE_BOX);
+						parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_ARB_TAG);
 					}
 					else
 					{
-						parent->_update_one_task_sp(ptask, PROCESS_STATE::PACKAGE);
+						if (ptask->m_is_get_hwrt_tag && parent->m_param.is_ocr_handwrite)
+						{
+							parent->_update_one_task_sp(ptask, PROCESS_STATE::OCR_HANDWRITE_BOX);
+						}
+						else
+						{
+							parent->_update_one_task_sp(ptask, PROCESS_STATE::PACKAGE);
+						}
+
 					}
-					
 				}
 			}
+
 		}
 	//while
 	}
@@ -674,13 +691,35 @@ void OCR_MainWoker::thread_load_image(OCR_MainWoker* parent)
 
 }
 
+
+// char *strstr(char *src, char *sub)
+// {
+// 	if (src == NULL || sub == NULL)
+// 		return src;
+// 	char *bp = NULL;
+// 	char *sp = NULL;
+// 	while (*src)
+// 	{
+// 		bp = src;
+// 		sp = sub;
+// 		while (*sp++ == *bp++)
+// 		{
+// 			if (!*sp)
+// 				return src;
+// 		}
+// 		src += 1;
+// 	}
+// 	return NULL;
+// }
+
+
 void OCR_MainWoker::thread_cut_parcel(OCR_MainWoker* parent)
 {
 	float tray_lf = parent->m_param.tray_lf;
 	float tray_rt = parent->m_param.tray_rt;
 	int tray_pix = parent->m_param.tray_pix;
 	TaskData*ptask;
-	
+	int saved_num = 0;
 	while (true)
 	{
 		int res = parent->_acquire_one_task(&ptask, PROCESS_STATE::CUT_PARCEL);
@@ -699,8 +738,20 @@ void OCR_MainWoker::thread_cut_parcel(OCR_MainWoker* parent)
 		cv::Mat _parcel;
 		try
 		{
-			res = CutParcelBox::cutParcelMat(*ptask->pSrcMat, _parcel, tray_lf, \
-				tray_rt, tray_pix, ptask->m_enImageView, 0);
+			const char* is_croped = strstr(ptask->m_chsRemoteImgPath.c_str(), "crop");
+			if (is_croped)
+			{
+				ptask->pSrcMat->copyTo(_parcel);
+				logger->debug("thread cut parcel: taskid:{}-{}/{}, src image is croped", ptask->m_image_id_num, \
+					ptask->m_sub_task_id, ptask->m_image_total_num);
+				res = 1;
+			}
+			else
+			{
+				res = CutParcelBox::cutParcelMat(*ptask->pSrcMat, _parcel, tray_lf, \
+					tray_rt, tray_pix, ptask->m_enImageView, 0);
+			}
+
 		}
 		catch (...)
 		{
@@ -708,6 +759,11 @@ void OCR_MainWoker::thread_cut_parcel(OCR_MainWoker* parent)
 		}
 		if (res)
 		{
+			if (parent->m_param.is_test_mode)
+			{
+				cv::imwrite(CommonFunc::get_exe_dir() + "\\saved_file\\parcel"+ std::to_string(saved_num % 10)+".jpg", _parcel);
+				saved_num += 1;
+			}
 			if (!ptask->parcelMat)
 			{
 				ptask->parcelMat = new cv::Mat();
@@ -881,6 +937,7 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 	std::string exe_dir = CommonFunc::get_exe_dir();
 	OCRArbitaryTag arbocr;
 	OcrAlgorithm_config cfg;
+	OCRLotteryTag lotocr;
 	cfg.strict_mode = parent->m_param.use_strict_mode;
 	bool support_10bit = parent->m_param.support_code_num_10;
 	int configs_size = 1;
@@ -919,16 +976,51 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 	while (true)
 	{
 
-		int res = parent->_acquire_one_task(&ptask, (PROCESS_STATE)(PROCESS_STATE::OCR_ARB_TAG | PROCESS_STATE::OCR_WIN_TAG));
+		int res = parent->_acquire_one_task(&ptask, (PROCESS_STATE)(PROCESS_STATE::OCR_ARB_TAG |
+			PROCESS_STATE::OCR_WIN_TAG | PROCESS_STATE::OCR_LOTTERY_TAG));
 		if (!res)
 		{
 			stl::time::sleep(5);
 			continue;
 		}
 
-
 		logger->debug("thread ocr arb tag: get a task, taskid:{}-{}/{}", ptask->m_image_id_num, \
 			ptask->m_sub_task_id, ptask->m_image_total_num);
+
+		if (ptask->m_is_get_lottery_tag) //彩票标签
+		{
+			std::cout << "thread ocr arb tag: get a lottery tag:" << std::endl;
+			cv::Mat win_tag_m;
+			ImageProcessFunc::getMatFromRotatedRect(*ptask->parcelMat, win_tag_m, ptask->m_rc_lottery_tag, 125);
+			std::string ss;
+			try
+			{
+				ss = lotocr.get_postcode_string(win_tag_m, &cfg);
+			}
+			catch (...)
+			{
+				logger->warn("Some exception raised in ocr lottery tag, imageid:{}, subid:{}", \
+					ptask->m_image_id_num, ptask->m_sub_task_id);
+			}
+
+			if (ss.length() == 5)
+			{
+				ptask->m_postcodeNum = 1;
+				ptask->m_chsOcrPostcode = ss;
+				ptask->m_postcode_of_tag_type = TAG_INDEX::LOT_TAG;
+			}
+			else
+			{
+				logger->info("Do not find postcode in ocr lottery tag, imageid:{}, subid : {}, log={}", \
+					ptask->m_image_id_num, ptask->m_sub_task_id,lotocr.get_last_log());
+			}
+			logger->info("thread ocr arb tag, get a lottery tag postcode: {}", ss);
+			
+			ptask->m_time_ocr = stl::time::tick();
+			parent->_update_one_task_sp(ptask, PROCESS_STATE::PACKAGE);
+			continue;
+		}
+
 
 		if (ptask->m_is_get_win_tag) //窗口标签
 		{
@@ -1031,6 +1123,11 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 						ptask->m_image_id_num, ptask->m_sub_task_id);
 				}
 
+				if (postcode.empty())
+				{
+					logger->debug("thread ocr std tag: get no postcode, {}", arbocr.get_last_log());
+				}
+
 				if (postcode.length() == 5 || (support_10bit && postcode.length() == 10))
 				{
 					ptask->m_postcodeNum = 1;
@@ -1038,9 +1135,12 @@ void OCR_MainWoker::thread_ocr_arb_tag(OCR_MainWoker* parent)
 					ptask->m_postcode_of_tag_type = TAG_INDEX::ARB_TAG;
 					std::cout << "Thread ocr arb tag: get a arb tag postcode: " << postcode << std::endl;
 				}
+				else
+				{
+					cv::imwrite(exe_dir + "\\saved_file\\arb_" + std::to_string(noread_num % 100) + ".jpg", arb_tag_m);
+					noread_num += 1;
+				}
 			}
-
-
 		}
 		ptask->m_time_ocr = stl::time::tick();
 		parent->_update_one_task_sp(ptask, PROCESS_STATE::PACKAGE);
@@ -1163,7 +1263,7 @@ void OCR_MainWoker::thread_ocr_hwrt_box(OCR_MainWoker* parent)
 				}
 				if (!hwer.empty() && ocr_res.empty())
 				{
-					cv::imwrite(exe_dir + "\\saved_file\\box_" + std::to_string(noread_num) + ".jpg", hwer);
+					cv::imwrite(exe_dir + "\\saved_file\\hwrt_" + std::to_string(noread_num) + ".jpg", hwer);
 					noread_num += 1;
 					if (noread_num > 100) noread_num = 0;
 				}
@@ -1403,7 +1503,7 @@ void OCR_MainWoker::push_debug_image(const std::string &postcode)
 	ptask->m_task_id = 99999999;
 	ptask->m_time_start = stl::time::tick();
 	ptask->m_time_load_image = stl::time::tick();
-	
+	ptask->m_chsRemoteImgPath = postcode;
 	cv::Mat m = cv::imread(postcode);
 	if (m.empty())
 	{
@@ -1531,7 +1631,7 @@ std::string OCR_MainWoker::log_task_tostring(TaskData*ptask)
 
 	//是否检测到标签
 	log += std::string("detection_tag:") + std::to_string(ptask->m_is_get_std_tag) + std::to_string(ptask->m_is_get_win_tag)\
-		+ std::to_string(ptask->m_is_get_arb_tag) + std::to_string(ptask->m_is_get_hwrt_tag)+"(swah), ";
+		+ std::to_string(ptask->m_is_get_arb_tag)+ std::to_string(ptask->m_is_get_lottery_tag) + std::to_string(ptask->m_is_get_hwrt_tag)+"(swahl), ";
 
 	//是否检测到邮编
 	log += std::string("postcode_num:") + std::to_string(ptask->m_postcodeNum) + ", ";
@@ -1556,6 +1656,9 @@ std::string OCR_MainWoker::log_task_tostring(TaskData*ptask)
 			break;
 		case TAG_INDEX::HDW_BOX:
 			log += std::string("hdw_tag, ");
+			break;
+		case TAG_INDEX::LOT_TAG:
+			log += std::string("lot_tag, ");
 			break;
 		default:
 			log += std::string("None, ");
